@@ -16,7 +16,7 @@ public class CorrectionServiceImplTest
     @Test
     public void test()
     {
-        CorrectionServiceImpl correctionService = new CorrectionServiceImpl();
+        CorrectionService correctionService = new CorrectionServicePinyinImpl();
         BufferedReader br = null;
         try 
         {
@@ -44,11 +44,11 @@ public class CorrectionServiceImplTest
                 if (result.contains(normalName)) 
                 {
                     positiveNum ++ ;
-                    System.out.println("输入电影为: [" + errorName + "]; 候选电影为： " + result);
+                    System.out.println("输入电影为: [" + errorName + "]; 候选电影为： " + result + "; 目标电影为: [" + normalName + "]");
                 }
                 else
                 {
-                    System.out.println("没有找到合适的电影。输入电影为: [" + errorName + "]; 候选电影为： " + result);
+                    System.out.println("没有找到合适的电影。输入电影为: [" + errorName + "]; 候选电影为： " + result + "; 目标电影为: [" + normalName + "]");
                 }
                 long endTime = System.currentTimeMillis();
                 System.out.println("用时: [" + (endTime - startTime) + " ms]");

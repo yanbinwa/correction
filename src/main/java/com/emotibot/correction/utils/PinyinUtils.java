@@ -1,5 +1,7 @@
 package com.emotibot.correction.utils;
 
+import com.emotibot.correction.element.PinyinElement;
+
 import net.sourceforge.pinyin4j.PinyinHelper;
 import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
 import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
@@ -9,6 +11,7 @@ import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombi
 
 public class PinyinUtils
 {
+    public static final String PINYIN_SPLIT = "&";
     private static HanyuPinyinOutputFormat defaultFormat = null;
     
     static
@@ -99,7 +102,7 @@ public class PinyinUtils
                 }
                 else
                 {
-                    pinyin.append("&");
+                    pinyin.append(PINYIN_SPLIT);
                 }
                 String str1 = String.valueOf(arrays[i]);
                 if (str1.matches("[\u4e00-\u9fa5]+"))
@@ -164,5 +167,15 @@ public class PinyinUtils
                 return false;
             }
         }
+    }
+    
+    public static PinyinElement append(PinyinElement... pinyinArray)
+    {
+        PinyinElement ret = new PinyinElement();
+        for(PinyinElement element : pinyinArray)
+        {
+            ret.append(element);
+        }
+        return ret;
     }
 }
