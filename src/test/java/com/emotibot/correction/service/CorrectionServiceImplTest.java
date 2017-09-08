@@ -16,7 +16,7 @@ public class CorrectionServiceImplTest
     @Test
     public void test()
     {
-        CorrectionService correctionService = new CorrectionServicePinyinImpl();
+        CorrectionService correctionService = new CorrectionServiceImpl();
         BufferedReader br = null;
         try 
         {
@@ -40,7 +40,7 @@ public class CorrectionServiceImplTest
                 String errorName = line_gbk[1];
                 String normalName = line_gbk[0];
                 long startTime = System.currentTimeMillis();
-                result = correctionService.correct(errorName);
+                result = correctionService.correctWithPinyin(errorName);
                 if (result.contains(normalName)) 
                 {
                     positiveNum ++ ;

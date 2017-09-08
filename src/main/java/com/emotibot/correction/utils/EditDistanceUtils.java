@@ -41,7 +41,7 @@ public class EditDistanceUtils
         return dif[len1][len2]; 
     }
     
-    public static int getEditDistance(SentenceElement ele1, SentenceElement ele2)
+    public static double getEditDistance(SentenceElement ele1, SentenceElement ele2)
     {
         String sentence1 = ele1.getSentence();
         String[] pinyinArray1 = ele1.getPinyin();
@@ -49,6 +49,7 @@ public class EditDistanceUtils
         String[] pinyinArray2 = ele2.getPinyin();
         int len1 = sentence1.length();
         int len2 = sentence2.length();
+        int wordErrorCount = 0;
         
         int[][] dif = new int[len1 + 1][len2 + 1];
         for (int a = 0; a <= len1; a++) 
@@ -79,6 +80,7 @@ public class EditDistanceUtils
                     else if (PinyinUtils.comparePinyin(pingyin1, pingyin2))
                     {
                         temp = 0;
+                        wordErrorCount ++;
                     }
                     else
                     {
@@ -88,7 +90,7 @@ public class EditDistanceUtils
                 dif[i][j] = min(dif[i - 1][j - 1] + temp, dif[i][j - 1] + 1, dif[i - 1][j] + 1);
             }  
         } 
-        return dif[len1][len2];
+        return dif[len1][len2] + wordErrorCount * 0.1;
     }
     
     private static int min(int a, int b, int c)
