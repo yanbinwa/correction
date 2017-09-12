@@ -50,6 +50,7 @@ public class EditDistanceUtils
         int len1 = sentence1.length();
         int len2 = sentence2.length();
         int wordErrorCount = 0;
+        int pinyinSameCount = 0;
         
         int[][] dif = new int[len1 + 1][len2 + 1];
         for (int a = 0; a <= len1; a++) 
@@ -84,13 +85,17 @@ public class EditDistanceUtils
                     }
                     else
                     {
+//                        if (getEditDistance(pingyin1, pingyin2) < 2)
+//                        {
+//                            pinyinSameCount ++;
+//                        }
                         temp = 1;
                     }
                 }
                 dif[i][j] = min(dif[i - 1][j - 1] + temp, dif[i][j - 1] + 1, dif[i - 1][j] + 1);
             }  
         } 
-        return dif[len1][len2] + wordErrorCount * 0.1;
+        return dif[len1][len2] + wordErrorCount * 0.2 - pinyinSameCount * 0.1;
     }
     
     private static int min(int a, int b, int c)

@@ -150,15 +150,12 @@ public class PinyinUtils
         }
         else
         {
-            if (pinyin1.endsWith("g"))
+            //TODO 卷舌和翘舌
+            if (sameNasals(pinyin1, pinyin2))
             {
-                pinyin1 = pinyin1.substring(0, pinyin1.length() - 1);
+                return true;
             }
-            if (pinyin2.endsWith("g"))
-            {
-                pinyin2 = pinyin2.substring(0, pinyin2.length() - 1);
-            }
-            if (pinyin1.equals(pinyin2))
+            else if (samePingqiao(pinyin1, pinyin2))
             {
                 return true;
             }
@@ -167,6 +164,51 @@ public class PinyinUtils
                 return false;
             }
         }
+    }
+    
+    private static boolean sameNasals(String pinyin1, String pinyin2)
+    {
+        if (pinyin1.endsWith("g"))
+        {
+            pinyin1 = pinyin1.substring(0, pinyin1.length() - 1);
+        }
+        if (pinyin2.endsWith("g"))
+        {
+            pinyin2 = pinyin2.substring(0, pinyin2.length() - 1);
+        }
+        if (pinyin1.equals(pinyin2))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+    
+    private static boolean samePingqiao(String pinyin1, String pinyin2)
+    {
+        int diffLen = Math.abs(pinyin1.length() - pinyin2.length());
+        if (diffLen != 1)
+        {
+            return false;
+        }
+        if (pinyin1.length() < pinyin2.length())
+        {
+            String tmp = pinyin1;
+            pinyin1 = pinyin2;
+            pinyin2 = tmp;
+        }
+        if (pinyin1.length() < 3)
+        {
+            return false;
+        }
+        if (!String.valueOf(pinyin1.charAt(1)).equals("h"))
+        {
+            return false;
+        }
+        String pinyin1Tmp = pinyin1.substring(0, 1) + pinyin1.substring(2, pinyin1.length());
+        return pinyin1Tmp.equals(pinyin2);
     }
     
     public static PinyinElement append(PinyinElement... pinyinArray)

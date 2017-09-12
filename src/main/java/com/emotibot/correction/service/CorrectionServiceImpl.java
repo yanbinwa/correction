@@ -9,8 +9,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.emotibot.correction.constants.Constants;
@@ -20,18 +22,25 @@ import com.emotibot.correction.utils.EditDistanceUtils;
 import com.emotibot.correction.utils.PinyinUtils;
 import com.emotibot.correction.utils.SegementUtils;
 import com.emotibot.middleware.conf.ConfigManager;
+import com.emotibot.middleware.utils.StringUtils;
 
 public class CorrectionServiceImpl implements CorrectionService
 {
-    private int selectNum = 2;
+    //TODO 
+    private int selectNum = 10;
     private int hasError = 0;
     private long totalTokensCount = 0L;
+    @SuppressWarnings("unused")
+    private long totalCommonTokensCount = 0L;
     
     private Map<String, Integer> wordCountMap = new HashMap<String, Integer>();
+    private Map<String, Integer> commonWordCountMap = new HashMap<String, Integer>();
     private Map<Integer, List<SentenceElement>> sentenceLengthToSentenceMap = 
                                                 new HashMap<Integer, List<SentenceElement>>();
     private String originalFilePath = null;
     private String targetFilePath = null;
+    private String commonSentenceFilePath = null;
+    private String commonSentenceTargetFilePath = null;
     
     //pinyin
     private long totalTokensCount2 = 0L;
@@ -43,15 +52,25 @@ public class CorrectionServiceImpl implements CorrectionService
     {
         originalFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.ORIGIN_FILE_PATH);
         targetFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.TARGET_FILE_PATH);
+        commonSentenceFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.COMMON_SENTENCE_FILE_PATH);
+        commonSentenceTargetFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.COMMON_SENTENCE_TARGET_FILE_PATH);
         try
         {
-            SegementUtils.segementFile(originalFilePath, targetFilePath);
+            if (commonSentenceFilePath != null && commonSentenceTargetFilePath != null)
+            {
+                SegementUtils.segementFile(originalFilePath, targetFilePath, commonSentenceFilePath, commonSentenceTargetFilePath);
+            }
+            else
+            {
+                SegementUtils.segementFile(originalFilePath, targetFilePath);
+            }
         } 
         catch (Exception e)
         {
             e.printStackTrace();
         }
         initWordCountMap();
+        initCommonWordCountMap();
         initPinyinCountMap();
         initSentenceMap();
     }
@@ -93,6 +112,73 @@ public class CorrectionServiceImpl implements CorrectionService
                 }
             }
             wordCountMap = wordCountMapTmp;
+        }
+        catch (IOException e) 
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            lock.unlock();
+            if (br != null)
+            {
+                try
+                {
+                    br.close();
+                } 
+                catch (IOException e)
+                {
+                    //Do nothing
+                }
+            }
+        }
+    }
+    
+    private void initCommonWordCountMap()
+    {
+        if (StringUtils.isEmpty(commonSentenceTargetFilePath))
+        {
+            return;
+        }
+        lock.lock();
+        BufferedReader br = null;
+        try
+        {
+            Map<String, Integer> commonWordCountMapTmp = new HashMap<String, Integer>();
+            File targetFile = new File(commonSentenceTargetFilePath);
+            br = new BufferedReader(new FileReader(targetFile));
+            
+            String wordsline = null;
+            while ((wordsline = br.readLine()) != null)
+            {
+                String[] words = wordsline.trim().split(" ");
+                for (int i = 0; i < words.length; i++)
+                {
+                    int wordCount = commonWordCountMapTmp.get(words[i]) == null ? 0 : commonWordCountMapTmp.get(words[i]);
+                    commonWordCountMapTmp.put(words[i], wordCount + 1);
+                    totalCommonTokensCount += 1;
+                    
+                    String word = words[i];
+                    for (int j = 0; j < word.length(); j ++)
+                    {
+                        String chat = String.valueOf(word.charAt(j));
+                        int wordCount1 = commonWordCountMapTmp.get(chat) == null ? 0 : commonWordCountMapTmp.get(chat);
+                        commonWordCountMapTmp.put(chat, wordCount1 + 1);
+                        totalCommonTokensCount += 1;
+                    }
+                    
+                    if (words.length > 1 && i < words.length - 1)
+                    {
+                        StringBuffer wordStrBuf = new StringBuffer();
+                        wordStrBuf.append(words[i]).append(words[i + 1]);
+                        int wordStrCount = commonWordCountMapTmp.get(wordStrBuf.toString()) == null 
+                                                             ? 0 : commonWordCountMapTmp.get(wordStrBuf.toString());
+                        commonWordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + 1);
+                        totalCommonTokensCount += 1;
+                    }
+                }
+            }
+            commonWordCountMap = commonWordCountMapTmp;
         }
         catch (IOException e) 
         {
@@ -491,6 +577,12 @@ public class CorrectionServiceImpl implements CorrectionService
     private float probBetweenTowTokens(String token)
     {
         int count = wordCountMap.get(token) == null ? 0 : wordCountMap.get(token);
+        int commonCount = commonWordCountMap.get(token) == null ? 0 : commonWordCountMap.get(token);
+        count -= commonCount * 20;
+        if (count < 0)
+        {
+            return (float) 0.0;
+        }
         if (totalTokensCount > 0 )
         {
             return (float) count / totalTokensCount;
@@ -505,7 +597,8 @@ public class CorrectionServiceImpl implements CorrectionService
     {
         List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
         int moveLength = sInput.length();
-        for (int i = 1; i <= moveLength + 2; i ++)
+        //TODO
+        for (int i = 1; i <= moveLength + 10; i ++)
         {
             List<SentenceElement> moveNameList = sentenceLengthToSentenceMap.get(i);
             if (moveNameList != null)
@@ -518,6 +611,9 @@ public class CorrectionServiceImpl implements CorrectionService
     
     private List<SentenceElement> sortList(final SentenceElement originName, List<SentenceElement> originList)
     {
+        //TODO 这回需要去重，因为片名库中可能有重复的
+        Set<SentenceElement> set = new HashSet<SentenceElement>(originList);
+        originList = new ArrayList<SentenceElement>(set);
         Collections.sort(originList, new Comparator<SentenceElement>() 
         {
             public int compare(SentenceElement o1, SentenceElement o2)
@@ -538,6 +634,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 }
             }
         });
+        
         if (originList.size() > selectNum)
         {
             return originList.subList(0, selectNum);
@@ -636,7 +733,8 @@ public class CorrectionServiceImpl implements CorrectionService
         }
         PinyinElement[] MaxAndSecondMaxSequnce = getMaxAndSecondMaxSequnce2(sInputResult);
         System.out.println(Arrays.toString(MaxAndSecondMaxSequnce));
-        if (MaxAndSecondMaxSequnce == null)
+        MaxAndSecondMaxSequnce = adjustMaxAndSecondMaxSequnceForPinyin(MaxAndSecondMaxSequnce);
+        if (MaxAndSecondMaxSequnce == null || MaxAndSecondMaxSequnce.length == 0)
         {
             return new ArrayList<String>();
         }
@@ -684,6 +782,21 @@ public class CorrectionServiceImpl implements CorrectionService
                 SentenceElement element = new SentenceElement(sInput);
                 correctedList = sortList(element, correctedList);
             }
+            //TODO
+            else if (MaxAndSecondMaxSequnce.length == 1)
+            {
+                PinyinElement maxSequence = MaxAndSecondMaxSequnce[0];
+                List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(sInput);
+                
+                for (int j = 0; j < candidateSentenceList.size(); j++)
+                {
+                    SentenceElement sentenceElement = candidateSentenceList.get(j);
+                    if (sentenceElement.contains(maxSequence))
+                    {
+                        correctedList.add(candidateSentenceList.get(j));
+                    }
+                }
+            }
         }
         else 
         {
@@ -694,9 +807,28 @@ public class CorrectionServiceImpl implements CorrectionService
         return getSentenceList(correctedList);
     }
     
+    private PinyinElement[] adjustMaxAndSecondMaxSequnceForPinyin(PinyinElement[] maxAndSecondMaxSequnce)
+    {
+        if (maxAndSecondMaxSequnce == null || maxAndSecondMaxSequnce.length == 0)
+        {
+            return null;
+        }
+        List<PinyinElement> retList = new ArrayList<PinyinElement>();
+        for (PinyinElement element : maxAndSecondMaxSequnce)
+        {
+            if (element.getLength() >= 2)
+            {
+                retList.add(element);
+            }
+        }
+        return retList.toArray(new PinyinElement[retList.size()]);
+    }
+    
     /**
      * 这里应该是找到前两个可以匹配到最长的token，同时要选择出现频率较低的，这样可以包含更对的特征信息
      * 同时还要对于其子字符串中提取出出现频率最大的字串，将其从字符串中删除
+     * 
+     * 对于拼音，不能输出单个的音节
      * 
      * @param sInputResult
      * @return
@@ -800,7 +932,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 maxseqvaluableTokens -= 1 ;
                 littleword = maxSequence.remove(aword);
             }
-            else 
+            else if ((maxSequence2.getLength() - bword.getLength()) >= 2)
             {
                 maxseq2valuableTokens -= 1 ;
                 PinyinElement temp = new PinyinElement(maxSequence2);
@@ -966,7 +1098,8 @@ public class CorrectionServiceImpl implements CorrectionService
     {
         List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
         int moveLength = sInput.length();
-        for (int i = 1; i <= moveLength + 2; i ++)
+        //TODO
+        for (int i = 1; i <= moveLength * 2; i ++)
         {
             List<SentenceElement> moveNameList = sentenceLengthToSentenceMap.get(i);
             if (moveNameList != null)
