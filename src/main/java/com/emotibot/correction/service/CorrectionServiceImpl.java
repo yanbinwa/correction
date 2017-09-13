@@ -27,7 +27,7 @@ import com.emotibot.middleware.utils.StringUtils;
 public class CorrectionServiceImpl implements CorrectionService
 {
     //TODO 
-    private int selectNum = 10;
+    private int selectNum = 5;
     private int hasError = 0;
     private long totalTokensCount = 0L;
     @SuppressWarnings("unused")

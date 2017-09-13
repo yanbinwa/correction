@@ -67,6 +67,35 @@ public class SentenceElement
         return this.element.contains(element);
     }
     
+    public int getLength()
+    {
+        return this.sentence.length();
+    }
+    
+    public SentenceElement subSentenceElement(int start, int end)
+    {
+        SentenceElement element = new SentenceElement();
+        String sentence1 = this.sentence.substring(start, end);
+        String[] pinyin1 = new String[end - start];
+        for (int i = 0; i < end - start; i ++)
+        {
+            pinyin1[i] = this.pinyin[i + start];
+        }
+        String pinyinStr = "";
+        for (int i = 0; i < pinyin1.length; i ++)
+        {
+            if (i != 0)
+            {
+                pinyinStr += PinyinUtils.PINYIN_SPLIT;
+            }
+            pinyinStr += pinyin1[i];
+        }
+        element.setSentence(sentence1);
+        element.setPinyin(pinyin1);
+        element.setPinyinStr(new PinyinElement(pinyinStr));
+        return element;
+    }
+    
     @Override
     public String toString()
     {
