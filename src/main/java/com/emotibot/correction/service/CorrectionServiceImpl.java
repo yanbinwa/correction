@@ -81,6 +81,10 @@ public class CorrectionServiceImpl implements CorrectionService
         return suggest(targetStr);
     }
     
+    /**
+     * 将分词的结果逐一取出，如果分词结果之前已经出现过，那么就wordCount++，同时判断该分词与下一个分词的和是否之前出现过，如果出现过，将其结果对应的wordCount++
+     * 
+     */
     private void initWordCountMap()
     {
         lock.lock();
@@ -106,7 +110,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         wordStrBuf.append(words[i]).append(words[i + 1]);
                         int wordStrCount = wordCountMapTmp.get(wordStrBuf.toString()) == null 
                                                              ? 0 : wordCountMapTmp.get(wordStrBuf.toString());
-                        wordCountMapTmp.put(wordStrBuf.toString(), wordStrCount+1);
+                        wordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + 1);
                         totalTokensCount += 1;
                     }
                 }
@@ -134,6 +138,12 @@ public class CorrectionServiceImpl implements CorrectionService
         }
     }
     
+    /**
+     * 为了进一步排除影片之外的字段，防止这些字段干扰到电影，需要将用户请求的句式中的单词提取出来，作为反例提供
+     * 
+     * 逐一读取分词结果，累计出现频率，同时将每个分词结果中的字也提取出来，如果当前分词结果与下个分词结果组合后也出现过，也会进行统计
+     * 
+     */
     private void initCommonWordCountMap()
     {
         if (StringUtils.isEmpty(commonSentenceTargetFilePath))
@@ -201,6 +211,10 @@ public class CorrectionServiceImpl implements CorrectionService
         }
     }
 
+    /**
+     * 将正确的电影名称读取
+     * 
+     */
     private void initSentenceMap()
     {
         lock.lock();
@@ -497,7 +511,8 @@ public class CorrectionServiceImpl implements CorrectionService
                         else
                         {
                             hasError = 1;
-                            if (j < sInputResult.length-1 && 
+                            //虽然tokenbuf.toString() + sInputResult[j]不存在，但是tokenbuf.toString() + sInputResult[j] + sInputResult[j + 1]存在
+                            if (j < sInputResult.length - 1 && 
                                     probBetweenTowTokens(tokenbuf.toString() + sInputResult[j] + sInputResult[j + 1]) > 0)
                             {
                                 tokenbuf.append(sInputResult[j] + sInputResult[j + 1]);
@@ -571,7 +586,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 correctTokens.add(sInputResult[0] + sInputResult[1]);
             }
         }
-        return correctTokens ;
+        return correctTokens;
     }
     
     private float probBetweenTowTokens(String token)
