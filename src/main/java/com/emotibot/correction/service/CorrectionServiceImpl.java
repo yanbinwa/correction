@@ -37,6 +37,8 @@ public class CorrectionServiceImpl implements CorrectionService
     private Map<String, Integer> commonWordCountMap = new HashMap<String, Integer>();
     private Map<Integer, List<SentenceElement>> sentenceLengthToSentenceMap = 
                                                 new HashMap<Integer, List<SentenceElement>>();
+    //记录token是来自哪个句子的，之后就可以快速定位了
+    private Map<String, Set<String>> tokenToTargetSentenceMap = new HashMap<String,Set<String>>();
     private String originalFilePath = null;
     private String targetFilePath = null;
     private String commonSentenceFilePath = null;
@@ -45,6 +47,9 @@ public class CorrectionServiceImpl implements CorrectionService
     //pinyin
     private long totalTokensCount2 = 0L;
     private Map<PinyinElement, Integer> pinyinCountMap = new HashMap<PinyinElement, Integer>();
+    private Map<String, Set<String>> pinyinTokenToTargetSentenceMap = new HashMap<String,Set<String>>();
+    
+    private Map<String, SentenceElement> targetSentenceToElementMap = new HashMap<String, SentenceElement>();
     
     private ReentrantLock lock = new ReentrantLock();
     
@@ -96,13 +101,16 @@ public class CorrectionServiceImpl implements CorrectionService
             br = new BufferedReader(new FileReader(targetFile));
             
             String wordsline = null;
+            String targetLine = null;
             while ((wordsline = br.readLine()) != null)
             {
+                targetLine = wordsline.replace(" ", "");
                 String[] words = wordsline.trim().split(" ");
                 for (int i = 0; i < words.length; i++)
                 {
                     int wordCount = wordCountMapTmp.get(words[i]) == null ? 0 : wordCountMapTmp.get(words[i]);
                     wordCountMapTmp.put(words[i], wordCount + 1);
+                    addTokenToTargetSentenceMap(words[i], targetLine);
                     totalTokensCount += 1;
                     
                     /** ----------------------- test ----------------------*/
@@ -112,6 +120,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         String chat = String.valueOf(word.charAt(j));
                         int wordCount1 = wordCountMapTmp.get(chat) == null ? 0 : wordCountMapTmp.get(chat);
                         wordCountMapTmp.put(chat, wordCount1 + 1);
+                        addTokenToTargetSentenceMap(chat, targetLine);
                         totalCommonTokensCount += 1;
                     }
                     /** ----------------------- test ----------------------*/
@@ -123,6 +132,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         int wordStrCount = wordCountMapTmp.get(wordStrBuf.toString()) == null 
                                                              ? 0 : wordCountMapTmp.get(wordStrBuf.toString());
                         wordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + 1);
+                        addTokenToTargetSentenceMap(wordStrBuf.toString(), targetLine);
                         totalTokensCount += 1;
                     }
                 }
@@ -250,6 +260,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 }
                 SentenceElement element = new SentenceElement(sentence.trim());
                 sentenceElementList.add(element);
+                targetSentenceToElementMap.put(sentence.trim(), element);
             }
             sentenceLengthToSentenceMap = sentenceLengthToSentenceMapTmp;
         }
@@ -298,7 +309,8 @@ public class CorrectionServiceImpl implements CorrectionService
                 String maxSequence = MaxAndSecondMaxSequnce[0];
                 String maxSequence2 = MaxAndSecondMaxSequnce[1];
                 //这里遍历sentence，可以做成并行处理，提高效率
-                List<SentenceElement> candidateSentenceList = getCandidateSentenceList(sInput);
+                //List<SentenceElement> candidateSentenceList = getCandidateSentenceList(sInput);
+                List<SentenceElement> candidateSentenceList = getCandidateSentenceList(maxSequence, maxSequence2);
                 
                 for (int j = 0; j < candidateSentenceList.size(); j++)
                 {
@@ -620,6 +632,7 @@ public class CorrectionServiceImpl implements CorrectionService
         }        
     }
     
+    @SuppressWarnings("unused")
     private List<SentenceElement> getCandidateSentenceList(String sInput)
     {
         List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
@@ -631,6 +644,30 @@ public class CorrectionServiceImpl implements CorrectionService
             if (moveNameList != null)
             {
                 retMoveNameList.addAll(moveNameList);
+            }
+        }
+        return retMoveNameList;
+    }
+    
+    //这里直接抓取token
+    private List<SentenceElement> getCandidateSentenceList(String maxSequence, String maxSequence2)
+    {
+        Set<String> retStringSet = new HashSet<>();
+        if (!StringUtils.isEmpty(maxSequence))
+        {
+            retStringSet.addAll(tokenToTargetSentenceMap.get(maxSequence));
+        }
+        if (!StringUtils.isEmpty(maxSequence2))
+        {
+            retStringSet.addAll(tokenToTargetSentenceMap.get(maxSequence2));
+        }
+        List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
+        for (String target : retStringSet)
+        {
+            SentenceElement element = targetSentenceToElementMap.get(target);
+            if (element != null)
+            {
+                retMoveNameList.add(element);
             }
         }
         return retMoveNameList;
@@ -701,8 +738,10 @@ public class CorrectionServiceImpl implements CorrectionService
             br = new BufferedReader(new FileReader(targetFile));
             
             String wordsline = null;
+            String targetline = null;
             while ((wordsline = br.readLine()) != null)
             {
+                targetline = wordsline.replace(" ", "");
                 String[] words = wordsline.trim().split(" ");
                 List<PinyinElement> pinyinList = new ArrayList<PinyinElement>();
                 for (String word : words)
@@ -714,6 +753,7 @@ public class CorrectionServiceImpl implements CorrectionService
                     PinyinElement element = pinyinList.get(i);
                     int wordCount = wordCountMapTmp.get(element) == null ? 0 : wordCountMapTmp.get(element);
                     wordCountMapTmp.put(element, wordCount + 1);
+                    addPinyinTokenToTargetSentenceMap(element.getPinyin(), targetline);
                     totalTokensCount2 += 1;
                     
                     if (words.length > 1 && i < words.length - 1)
@@ -721,6 +761,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         PinyinElement element1 = PinyinUtils.append(pinyinList.get(i), pinyinList.get(i + 1));
                         int wordStrCount = wordCountMapTmp.get(element1) == null ? 0 : wordCountMapTmp.get(element1);
                         wordCountMapTmp.put(element1, wordStrCount+1);
+                        addPinyinTokenToTargetSentenceMap(element1.getPinyin(), targetline);
                         totalTokensCount2 += 1;
                     }
                 }               
@@ -773,8 +814,8 @@ public class CorrectionServiceImpl implements CorrectionService
                 PinyinElement maxSequence = MaxAndSecondMaxSequnce[0];
                 PinyinElement maxSequence2 = MaxAndSecondMaxSequnce[1];
                 //这里遍历sentence，可以做成并行处理，提高效率
-                List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(sInput);
-                
+                //List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(sInput);
+                List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyin(), maxSequence2.getPinyin());
                 for (int j = 0; j < candidateSentenceList.size(); j++)
                 {
                     SentenceElement sentenceElement = candidateSentenceList.get(j);
@@ -1138,6 +1179,29 @@ public class CorrectionServiceImpl implements CorrectionService
         return retMoveNameList;
     }
     
+    private List<SentenceElement> getCandidateSentenceList2(String maxSequence, String maxSequence2)
+    {
+        Set<String> retStringSet = new HashSet<>();
+        if (!StringUtils.isEmpty(maxSequence))
+        {
+            retStringSet.addAll(pinyinTokenToTargetSentenceMap.get(maxSequence));
+        }
+        if (!StringUtils.isEmpty(maxSequence2))
+        {
+            retStringSet.addAll(pinyinTokenToTargetSentenceMap.get(maxSequence2));
+        }
+        List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
+        for (String target : retStringSet)
+        {
+            SentenceElement element = targetSentenceToElementMap.get(target);
+            if (element != null)
+            {
+                retMoveNameList.add(element);
+            }
+        }
+        return retMoveNameList;
+    }
+    
     private int compareFloatToInt(float floatVal, int intVal)
     {
         if(Math.abs(floatVal - intVal) < 1e-5)
@@ -1152,5 +1216,27 @@ public class CorrectionServiceImpl implements CorrectionService
         {
             return -1;
         }
+    }
+    
+    private void addTokenToTargetSentenceMap(String token, String sentence)
+    {
+        Set<String> targetSentenceSet = tokenToTargetSentenceMap.get(token);
+        if (targetSentenceSet == null)
+        {
+            targetSentenceSet = new HashSet<String>();
+            tokenToTargetSentenceMap.put(token, targetSentenceSet);
+        }
+        targetSentenceSet.add(sentence);
+    }
+    
+    private void addPinyinTokenToTargetSentenceMap(String token, String sentence)
+    {
+        Set<String> targetSentenceSet = pinyinTokenToTargetSentenceMap.get(token);
+        if (targetSentenceSet == null)
+        {
+            targetSentenceSet = new HashSet<String>();
+            pinyinTokenToTargetSentenceMap.put(token, targetSentenceSet);
+        }
+        targetSentenceSet.add(sentence);
     }
 }
