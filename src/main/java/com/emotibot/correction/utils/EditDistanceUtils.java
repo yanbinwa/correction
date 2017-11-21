@@ -1,5 +1,6 @@
 package com.emotibot.correction.utils;
 
+import com.emotibot.correction.constants.Constants;
 import com.emotibot.correction.element.SentenceElement;
 
 /**
@@ -49,7 +50,8 @@ public class EditDistanceUtils
         String[] pinyinArray2 = ele2.getPinyin();
         int len1 = sentence1.length();
         int len2 = sentence2.length();
-        int wordErrorCount = 0;
+        int wordErrorCount1 = 0;
+        int wordErrorCount2 = 0;
         int pinyinSameCount = 0;
         
         int[][] dif = new int[len1 + 1][len2 + 1];
@@ -77,11 +79,13 @@ public class EditDistanceUtils
                     if (pingyin1.equals(pingyin2))
                     {
                         temp = 0;
+                        wordErrorCount1 ++;
                     }
+                    //TODO，这里要看是否最后使用到了，如果没有用到，反而会造成错误
                     else if (PinyinUtils.comparePinyin(pingyin1, pingyin2))
                     {
                         temp = 0;
-                        wordErrorCount ++;
+                        wordErrorCount2 ++;
                     }
                     else
                     {
@@ -95,7 +99,88 @@ public class EditDistanceUtils
                 dif[i][j] = min(dif[i - 1][j - 1] + temp, dif[i][j - 1] + 1, dif[i - 1][j] + 1);
             }  
         } 
-        return dif[len1][len2] + wordErrorCount * 0.2 - pinyinSameCount * 0.1;
+        return dif[len1][len2] + wordErrorCount1 * Constants.WORD_ERROR_1_RATE + wordErrorCount2 * Constants.WORD_ERROR_2_RATE - pinyinSameCount * Constants.PINYIN_RIGHT_RATE;
+    }
+    
+    /**
+     * 首先是比较是否有相同的字，如果有，就直接消除掉，之后比较是否有相同的音，如果有，也直接消除掉，之后判断两个element是否完全匹配出来了
+     * 
+     * @param ele1
+     * @param ele2
+     * @return
+     */
+    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    {
+        boolean[] tag1 = new boolean[ele1.getLength()];
+        boolean[] tag2 = new boolean[ele2.getLength()];
+        for (int i = 0; i < tag1.length; i ++)
+        {
+            tag1[i] = false;
+        }
+        for (int i = 0; i < tag2.length; i ++)
+        {
+            tag2[i] = false;
+        }
+        String sentence1 = ele1.getSentence();
+        String[] pinyinArray1 = ele1.getPinyin();
+        String sentence2 = ele2.getSentence();
+        String[] pinyinArray2 = ele2.getPinyin();
+        int wordErrorCount = 0;
+        for(int i = 0; i < ele1.getLength(); i ++)
+        {
+            char ch1 = sentence1.charAt(i);
+            String pingyin1 = pinyinArray1[i];
+            boolean isMatch = false;
+            for(int j = 0; j < ele2.getLength(); j ++)
+            {
+                if (tag2[j])
+                {
+                    continue;
+                }
+                char ch2 = sentence2.charAt(j);
+                if (ch1 == ch2)
+                {
+                    tag1[i] = true;
+                    tag2[j] = true;
+                    isMatch = true;
+                }
+            }
+            if (isMatch)
+            {
+                continue;
+            }
+            for(int j = 0; j < ele2.getLength(); j ++)
+            {
+                if (tag2[j])
+                {
+                    continue;
+                }
+                String pingyin2 = pinyinArray2[j];
+                if (PinyinUtils.comparePinyin(pingyin1, pingyin2))
+                {
+                    tag1[i] = true;
+                    tag2[j] = true;
+                    isMatch = true;
+                    wordErrorCount ++;
+                }
+            }
+        }
+        double ret = 0.0;
+        for (int i = 0; i < ele1.getLength(); i ++)
+        {
+            if (!tag1[i])
+            {
+                ret += 1;
+            }
+        }
+        for (int i = 0; i < ele2.getLength(); i ++)
+        {
+            if (!tag2[i])
+            {
+                ret += 1;
+            }
+        }
+        return ret + wordErrorCount * Constants.WORD_ERROR_COUNT_WITHOUT_ORDER;
     }
     
     private static int min(int a, int b, int c)

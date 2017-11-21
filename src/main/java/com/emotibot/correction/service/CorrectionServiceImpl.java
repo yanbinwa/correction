@@ -27,7 +27,7 @@ import com.emotibot.middleware.utils.StringUtils;
 public class CorrectionServiceImpl implements CorrectionService
 {
     //TODO 
-    private int selectNum = 5;
+    private int selectNum = Constants.CHOOSE_NUM;
     private int hasError = 0;
     private long totalTokensCount = 0L;
     @SuppressWarnings("unused")
@@ -104,6 +104,18 @@ public class CorrectionServiceImpl implements CorrectionService
                     int wordCount = wordCountMapTmp.get(words[i]) == null ? 0 : wordCountMapTmp.get(words[i]);
                     wordCountMapTmp.put(words[i], wordCount + 1);
                     totalTokensCount += 1;
+                    
+                    /** ----------------------- test ----------------------*/
+                    String word = words[i];
+                    for (int j = 0; j < word.length(); j ++)
+                    {
+                        String chat = String.valueOf(word.charAt(j));
+                        int wordCount1 = wordCountMapTmp.get(chat) == null ? 0 : wordCountMapTmp.get(chat);
+                        wordCountMapTmp.put(chat, wordCount1 + 1);
+                        totalCommonTokensCount += 1;
+                    }
+                    /** ----------------------- test ----------------------*/
+                    
                     if (words.length > 1 && i < words.length - 1)
                     {
                         StringBuffer wordStrBuf = new StringBuffer();
@@ -479,7 +491,7 @@ public class CorrectionServiceImpl implements CorrectionService
         {
             //这里获取到该单个字对应的token数量占总token的比例
             probOne = probBetweenTowTokens(sInputResult[i]);
-            if (probOne <= 0)
+            if (compareFloatToInt(probOne, 0) <= 0)
             {
                 isCorrect.add(i, 0);
             } 
@@ -504,7 +516,7 @@ public class CorrectionServiceImpl implements CorrectionService
                     {
                         float b = probBetweenTowTokens(tokenbuf.toString() + sInputResult[j]);
                         //这里应该是保证最大匹配吧
-                        if (b > 0)
+                        if (compareFloatToInt(b, 0) > 0)
                         {
                             tokenbuf.append(sInputResult[j]);
                         }
@@ -513,7 +525,7 @@ public class CorrectionServiceImpl implements CorrectionService
                             hasError = 1;
                             //虽然tokenbuf.toString() + sInputResult[j]不存在，但是tokenbuf.toString() + sInputResult[j] + sInputResult[j + 1]存在
                             if (j < sInputResult.length - 1 && 
-                                    probBetweenTowTokens(tokenbuf.toString() + sInputResult[j] + sInputResult[j + 1]) > 0)
+                                    compareFloatToInt(probBetweenTowTokens(tokenbuf.toString() + sInputResult[j] + sInputResult[j + 1]), 0) > 0)
                             {
                                 tokenbuf.append(sInputResult[j] + sInputResult[j + 1]);
                             }
@@ -526,7 +538,7 @@ public class CorrectionServiceImpl implements CorrectionService
                     correctTokens.add(tokenbuf.toString());
                 }
                 
-                if (probBetweenTowTokens(sInputResult[sInputResult.length - 1]) > 0)
+                if (compareFloatToInt(probBetweenTowTokens(sInputResult[sInputResult.length - 1]), 0) > 0)
                 {
                     correctTokens.add(sInputResult[sInputResult.length - 1]);
                 }
@@ -544,7 +556,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         for(int j = i + 1; j < sInputResult.length; j++)
                         {
                             float b = probBetweenTowTokens(tokenbuf.toString() + sInputResult[j]);
-                            if (b > 0) 
+                            if (compareFloatToInt(b, 0) > 0) 
                             {
                                 tokenbuf.append(sInputResult[j]);
                             }
@@ -557,13 +569,13 @@ public class CorrectionServiceImpl implements CorrectionService
                         correctTokens.add(tokenbuf.toString());
                     }
                     //虽然这个单词没有匹配成功，但是其与后面的匹配成功了，所以也是可以加入的
-                    else if (probBetweenTowTokens(sInputResult[i] + sInputResult[i + 1]) > 0.0)
+                    else if (compareFloatToInt(probBetweenTowTokens(sInputResult[i] + sInputResult[i + 1]), 0) > 0)
                     {
                         tokenbuf.append(sInputResult[i]).append(sInputResult[i + 1]);
                         for(int j = i + 2; j < sInputResult.length; j++)
                         {
                             float b = probBetweenTowTokens(tokenbuf.toString() + sInputResult[j]);
-                            if (b > 0) 
+                            if (compareFloatToInt(b, 0) > 0)
                             {
                                 tokenbuf.append(sInputResult[j]);
                             }
@@ -581,7 +593,7 @@ public class CorrectionServiceImpl implements CorrectionService
         } 
         else if (sInputResult.length == 2)
         {
-            if (probBetweenTowTokens(sInputResult[0] + sInputResult[1]) > 0)
+            if (this.compareFloatToInt(probBetweenTowTokens(sInputResult[0] + sInputResult[1]), 0) > 0)
             {
                 correctTokens.add(sInputResult[0] + sInputResult[1]);
             }
@@ -703,6 +715,7 @@ public class CorrectionServiceImpl implements CorrectionService
                     int wordCount = wordCountMapTmp.get(element) == null ? 0 : wordCountMapTmp.get(element);
                     wordCountMapTmp.put(element, wordCount + 1);
                     totalTokensCount2 += 1;
+                    
                     if (words.length > 1 && i < words.length - 1)
                     {
                         PinyinElement element1 = PinyinUtils.append(pinyinList.get(i), pinyinList.get(i + 1));
@@ -987,7 +1000,7 @@ public class CorrectionServiceImpl implements CorrectionService
         {
             //这里获取到该单个字对应的token数量占总token的比例
             probOne = probBetweenTowTokens2(sInputResult[i]);
-            if (probOne <= 0)
+            if (this.compareFloatToInt(probOne, 0) <= 0)
             {
                 isCorrect.add(i, 0);
             } 
@@ -1020,7 +1033,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         {
                             hasError = 1;
                             if (j < sInputResult.length - 1 && 
-                                    probBetweenTowTokens2(PinyinUtils.append(tokenbuf, sInputResult[j], sInputResult[j + 1])) > 0)
+                                    compareFloatToInt(probBetweenTowTokens2(PinyinUtils.append(tokenbuf, sInputResult[j], sInputResult[j + 1])), 0) > 0)
                             {
                                 tokenbuf.append(sInputResult[j]).append(sInputResult[j + 1]);
                             }
@@ -1033,7 +1046,7 @@ public class CorrectionServiceImpl implements CorrectionService
                     correctTokens.add(tokenbuf);
                 }
                 
-                if (probBetweenTowTokens2(sInputResult[sInputResult.length - 1]) > 0)
+                if (compareFloatToInt(probBetweenTowTokens2(sInputResult[sInputResult.length - 1]), 0) > 0)
                 {
                     correctTokens.add(sInputResult[sInputResult.length - 1]);
                 }
@@ -1051,7 +1064,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         for(int j = i + 1; j < sInputResult.length; j++)
                         {
                             float b = probBetweenTowTokens2(PinyinUtils.append(tokenbuf, sInputResult[j]));
-                            if (b > 0) 
+                            if (compareFloatToInt(b, 0) > 0) 
                             {
                                 tokenbuf.append(sInputResult[j]);
                             }
@@ -1064,13 +1077,13 @@ public class CorrectionServiceImpl implements CorrectionService
                         correctTokens.add(tokenbuf);
                     }
                     //虽然这个单词没有匹配成功，但是其与后面的匹配成功了，所以也是可以加入的
-                    else if (probBetweenTowTokens2(PinyinUtils.append(sInputResult[i], sInputResult[i + 1])) > 0.0)
+                    else if (compareFloatToInt(probBetweenTowTokens2(PinyinUtils.append(sInputResult[i], sInputResult[i + 1])), 0) > 0.0)
                     {
                         tokenbuf.append(sInputResult[i]).append(sInputResult[i + 1]);
                         for(int j = i + 2; j < sInputResult.length; j++)
                         {
                             float b = probBetweenTowTokens2(PinyinUtils.append(tokenbuf, sInputResult[j]));
-                            if (b > 0) 
+                            if (compareFloatToInt(b, 0) > 0) 
                             {
                                 tokenbuf.append(sInputResult[j]);
                             }
@@ -1088,7 +1101,7 @@ public class CorrectionServiceImpl implements CorrectionService
         } 
         else if (sInputResult.length == 2)
         {
-            if (probBetweenTowTokens2(PinyinUtils.append(sInputResult[0], sInputResult[1])) > 0)
+            if (compareFloatToInt(probBetweenTowTokens2(PinyinUtils.append(sInputResult[0], sInputResult[1])), 0) > 0)
             {
                 correctTokens.add(PinyinUtils.append(sInputResult[0], sInputResult[1]));
             }
@@ -1123,5 +1136,21 @@ public class CorrectionServiceImpl implements CorrectionService
             }
         }
         return retMoveNameList;
+    }
+    
+    private int compareFloatToInt(float floatVal, int intVal)
+    {
+        if(Math.abs(floatVal - intVal) < 1e-5)
+        {
+            return 0;
+        }
+        else if (floatVal > intVal)
+        {
+            return 1;
+        }
+        else
+        {
+            return -1;
+        }
     }
 }
