@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.log4j.Logger;
+
 import com.emotibot.correction.constants.Constants;
 import com.emotibot.correction.element.PinyinElement;
 import com.emotibot.correction.element.SentenceElement;
@@ -24,36 +26,44 @@ import com.emotibot.correction.utils.SegementUtils;
 import com.emotibot.middleware.conf.ConfigManager;
 import com.emotibot.middleware.utils.StringUtils;
 
-public class CorrectionServiceImpl implements CorrectionService
+public class CorrectionService2Impl implements CorrectionService
 {
-    //TODO 
-    private int selectNum = Constants.CHOOSE_NUM;
-    private int hasError = 0;
-    private long totalTokensCount = 0L;
-    @SuppressWarnings("unused")
-    private long totalCommonTokensCount = 0L;
-    
-    private Map<String, Integer> wordCountMap = new HashMap<String, Integer>();
-    private Map<String, Integer> commonWordCountMap = new HashMap<String, Integer>();
-    private Map<Integer, List<SentenceElement>> sentenceLengthToSentenceMap = 
-                                                new HashMap<Integer, List<SentenceElement>>();
-    //记录token是来自哪个句子的，之后就可以快速定位了
-    private Map<String, Set<String>> tokenToTargetSentenceMap = new HashMap<String,Set<String>>();
     private String originalFilePath = null;
     private String targetFilePath = null;
     private String commonSentenceFilePath = null;
     private String commonSentenceTargetFilePath = null;
     
-    //pinyin
+    private int hasError = 0;
+    private long totalTokensCount = 0L;
     private long totalTokensCount2 = 0L;
+    @SuppressWarnings("unused")
+    private long totalCommonTokensCount = 0L;
+    
+    private static final Logger logger = Logger.getLogger(CorrectionService2Impl.class);
+    /**
+     * 记录汉字到拼音的映射
+     */
+    private Map<String, Integer> wordCountMap = new HashMap<String, Integer>();
     private Map<PinyinElement, Integer> pinyinCountMap = new HashMap<PinyinElement, Integer>();
+    /**
+     * 去掉重复字段，没有拼音，只有汉字，也需要逐字来处理
+     */
+    private Map<String, Integer> commonWordCountMap = new HashMap<String, Integer>();
+    
+    /**
+     * token 到sentence的映射，汉字和拼音均有逐字的映射
+     */
+    private Map<String, Set<String>> tokenToTargetSentenceMap = new HashMap<String,Set<String>>();
     private Map<String, Set<String>> pinyinTokenToTargetSentenceMap = new HashMap<String,Set<String>>();
     
+    /**
+     * 标准语句到sentenceElement的映射，在最后排序时需要使用
+     */
     private Map<String, SentenceElement> targetSentenceToElementMap = new HashMap<String, SentenceElement>();
     
     private ReentrantLock lock = new ReentrantLock();
     
-    public CorrectionServiceImpl()
+    public CorrectionService2Impl()
     {
         originalFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.ORIGIN_FILE_PATH);
         targetFilePath = ConfigManager.INSTANCE.getPropertyString(Constants.TARGET_FILE_PATH);
@@ -69,27 +79,18 @@ public class CorrectionServiceImpl implements CorrectionService
             {
                 SegementUtils.segementFile(originalFilePath, targetFilePath);
             }
+            initWordCountMap();
+            initPinyinCountMap();
+            initCommonWordCountMap();
+            initSentenceMap();
         } 
+        
         catch (Exception e)
         {
             e.printStackTrace();
         }
-        initWordCountMap();
-        initCommonWordCountMap();
-        initPinyinCountMap();
-        initSentenceMap();
     }
     
-    @Override
-    public List<String> correct(String targetStr)
-    {
-        return suggest(targetStr);
-    }
-    
-    /**
-     * 将分词的结果逐一取出，如果分词结果之前已经出现过，那么就wordCount++，同时判断该分词与下一个分词的和是否之前出现过，如果出现过，将其结果对应的wordCount++
-     * 
-     */
     private void initWordCountMap()
     {
         lock.lock();
@@ -101,29 +102,33 @@ public class CorrectionServiceImpl implements CorrectionService
             br = new BufferedReader(new FileReader(targetFile));
             
             String wordsline = null;
-            String targetLine = null;
+            //分词前的句子
+            String originalLine = null;
             while ((wordsline = br.readLine()) != null)
             {
-                targetLine = wordsline.replace(" ", "");
+                originalLine = wordsline.replace(" ", "");
                 String[] words = wordsline.trim().split(" ");
                 for (int i = 0; i < words.length; i++)
                 {
+                    /**
+                     * 这里是直接的分词结果，所以可以加的比较多
+                     */
                     int wordCount = wordCountMapTmp.get(words[i]) == null ? 0 : wordCountMapTmp.get(words[i]);
-                    wordCountMapTmp.put(words[i], wordCount + 1);
-                    addTokenToTargetSentenceMap(words[i], targetLine);
-                    totalTokensCount += 1;
+                    wordCountMapTmp.put(words[i], wordCount + Constants.WORD_MATCH_COUNT);
+                    addTokenToTargetSentenceMap(words[i], originalLine);
+                    totalTokensCount += Constants.WORD_MATCH_COUNT;
                     
-                    /** ----------------------- test ----------------------*/
+                    /** ----------------------- single word start ----------------------*/
                     String word = words[i];
                     for (int j = 0; j < word.length(); j ++)
                     {
                         String chat = String.valueOf(word.charAt(j));
                         int wordCount1 = wordCountMapTmp.get(chat) == null ? 0 : wordCountMapTmp.get(chat);
-                        wordCountMapTmp.put(chat, wordCount1 + 1);
-                        addTokenToTargetSentenceMap(chat, targetLine);
-                        totalCommonTokensCount += 1;
+                        wordCountMapTmp.put(chat, wordCount1 + Constants.WORD_SINGLE_MATCH_COUNT);
+                        addTokenToTargetSentenceMap(chat, originalLine);
+                        totalTokensCount += Constants.WORD_SINGLE_MATCH_COUNT;
                     }
-                    /** ----------------------- test ----------------------*/
+                    /** ----------------------- single word end ----------------------*/
                     
                     if (words.length > 1 && i < words.length - 1)
                     {
@@ -131,13 +136,86 @@ public class CorrectionServiceImpl implements CorrectionService
                         wordStrBuf.append(words[i]).append(words[i + 1]);
                         int wordStrCount = wordCountMapTmp.get(wordStrBuf.toString()) == null 
                                                              ? 0 : wordCountMapTmp.get(wordStrBuf.toString());
-                        wordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + 1);
-                        addTokenToTargetSentenceMap(wordStrBuf.toString(), targetLine);
-                        totalTokensCount += 1;
+                        wordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + Constants.WORD_MATCH_COUNT);
+                        addTokenToTargetSentenceMap(wordStrBuf.toString(), originalLine);
+                        totalTokensCount += Constants.WORD_MATCH_COUNT;
                     }
                 }
             }
             wordCountMap = wordCountMapTmp;
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            lock.unlock();
+            if (br != null)
+            {
+                try
+                {
+                    br.close();
+                } 
+                catch (IOException e)
+                {
+                    //Do nothing
+                }
+            }
+        }
+    }
+    
+    private void initPinyinCountMap()
+    {
+        lock.lock();
+        BufferedReader br = null;
+        try
+        {
+            Map<PinyinElement, Integer> pinyinCountMapTmp = new HashMap<PinyinElement, Integer>();
+            File targetFile = new File(targetFilePath);
+            br = new BufferedReader(new FileReader(targetFile));
+            
+            String wordsline = null;
+            String targetline = null;
+            while ((wordsline = br.readLine()) != null)
+            {
+                targetline = wordsline.replace(" ", "");
+                String[] words = wordsline.trim().split(" ");
+                List<PinyinElement> pinyinList = new ArrayList<PinyinElement>();
+                for (String word : words)
+                {
+                    pinyinList.add(new PinyinElement(word));
+                }
+                for (int i = 0; i < pinyinList.size(); i ++)
+                {
+                    PinyinElement element = pinyinList.get(i);
+                    int wordCount = pinyinCountMapTmp.get(element) == null ? 0 : pinyinCountMapTmp.get(element);
+                    pinyinCountMapTmp.put(element, wordCount + Constants.PINYIN_MATCH_COUNT);
+                    addPinyinTokenToTargetSentenceMap(element.getPinyin(), targetline);
+                    totalTokensCount2 += Constants.PINYIN_MATCH_COUNT;
+                    
+                    /** ----------------------- single word start ----------------------*/
+                    for (int j = 0; j < element.getLength(); j ++)
+                    {
+                        PinyinElement element1 = element.subPinyinElement(j, j + 1);
+                        int wordCount1 = pinyinCountMapTmp.get(element1) == null ? 0 : pinyinCountMapTmp.get(element1);
+                        pinyinCountMapTmp.put(element1, wordCount1 + Constants.PINYIN_SINGLE_MATCH_COUNT);
+                        addPinyinTokenToTargetSentenceMap(element1.getPinyin(), targetline);
+                        totalTokensCount2 += Constants.PINYIN_SINGLE_MATCH_COUNT;
+                    }
+                    /** ----------------------- single word end ----------------------*/
+                    
+                    if (words.length > 1 && i < words.length - 1)
+                    {
+                        PinyinElement element1 = PinyinUtils.append(pinyinList.get(i), pinyinList.get(i + 1));
+                        int wordStrCount = pinyinCountMapTmp.get(element1) == null ? 0 : pinyinCountMapTmp.get(element1);
+                        pinyinCountMapTmp.put(element1, wordStrCount + Constants.PINYIN_MATCH_COUNT);
+                        addPinyinTokenToTargetSentenceMap(element1.getPinyin(), targetline);
+                        totalTokensCount2 += Constants.PINYIN_MATCH_COUNT;
+                    }
+                }               
+            }
+            pinyinCountMap = pinyinCountMapTmp;
         }
         catch (IOException e) 
         {
@@ -160,12 +238,6 @@ public class CorrectionServiceImpl implements CorrectionService
         }
     }
     
-    /**
-     * 为了进一步排除影片之外的字段，防止这些字段干扰到电影，需要将用户请求的句式中的单词提取出来，作为反例提供
-     * 
-     * 逐一读取分词结果，累计出现频率，同时将每个分词结果中的字也提取出来，如果当前分词结果与下个分词结果组合后也出现过，也会进行统计
-     * 
-     */
     private void initCommonWordCountMap()
     {
         if (StringUtils.isEmpty(commonSentenceTargetFilePath))
@@ -187,16 +259,16 @@ public class CorrectionServiceImpl implements CorrectionService
                 for (int i = 0; i < words.length; i++)
                 {
                     int wordCount = commonWordCountMapTmp.get(words[i]) == null ? 0 : commonWordCountMapTmp.get(words[i]);
-                    commonWordCountMapTmp.put(words[i], wordCount + 1);
-                    totalCommonTokensCount += 1;
+                    commonWordCountMapTmp.put(words[i], wordCount + Constants.COMMON_MATCH_COUNT);
+                    totalCommonTokensCount += Constants.COMMON_MATCH_COUNT;
                     
                     String word = words[i];
                     for (int j = 0; j < word.length(); j ++)
                     {
                         String chat = String.valueOf(word.charAt(j));
                         int wordCount1 = commonWordCountMapTmp.get(chat) == null ? 0 : commonWordCountMapTmp.get(chat);
-                        commonWordCountMapTmp.put(chat, wordCount1 + 1);
-                        totalCommonTokensCount += 1;
+                        commonWordCountMapTmp.put(chat, wordCount1 + Constants.COMMON_SINGLE_MATCH_COUNT);
+                        totalCommonTokensCount += Constants.COMMON_SINGLE_MATCH_COUNT;
                     }
                     
                     if (words.length > 1 && i < words.length - 1)
@@ -205,8 +277,8 @@ public class CorrectionServiceImpl implements CorrectionService
                         wordStrBuf.append(words[i]).append(words[i + 1]);
                         int wordStrCount = commonWordCountMapTmp.get(wordStrBuf.toString()) == null 
                                                              ? 0 : commonWordCountMapTmp.get(wordStrBuf.toString());
-                        commonWordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + 1);
-                        totalCommonTokensCount += 1;
+                        commonWordCountMapTmp.put(wordStrBuf.toString(), wordStrCount + Constants.COMMON_MATCH_COUNT);
+                        totalCommonTokensCount += Constants.COMMON_MATCH_COUNT;
                     }
                 }
             }
@@ -232,37 +304,24 @@ public class CorrectionServiceImpl implements CorrectionService
             }
         }
     }
-
-    /**
-     * 将正确的电影名称读取
-     * 
-     */
+    
     private void initSentenceMap()
     {
         lock.lock();
         BufferedReader br = null;
         try
         {
-            Map<Integer, List<SentenceElement>> sentenceLengthToSentenceMapTmp = 
-                                                        new HashMap<Integer, List<SentenceElement>>();
+            Map<String, SentenceElement> targetSentenceToElementMapTmp = new HashMap<String, SentenceElement>();
             File originalFile = new File(originalFilePath);
             br = new BufferedReader(new FileReader(originalFile));
             
             String sentence = null;
             while ((sentence = br.readLine()) != null)
             {
-                int length = sentence.length();
-                List<SentenceElement> sentenceElementList = sentenceLengthToSentenceMapTmp.get(length);
-                if (sentenceElementList == null)
-                {
-                    sentenceElementList = new ArrayList<SentenceElement>();
-                    sentenceLengthToSentenceMapTmp.put(length, sentenceElementList);
-                }
                 SentenceElement element = new SentenceElement(sentence.trim());
-                sentenceElementList.add(element);
-                targetSentenceToElementMap.put(sentence.trim(), element);
+                targetSentenceToElementMapTmp.put(sentence.trim(), element);
             }
-            sentenceLengthToSentenceMap = sentenceLengthToSentenceMapTmp;
+            targetSentenceToElementMap = targetSentenceToElementMapTmp;
         }
         catch (IOException e) 
         {
@@ -285,6 +344,36 @@ public class CorrectionServiceImpl implements CorrectionService
         }        
     }
     
+    private void addTokenToTargetSentenceMap(String token, String sentence)
+    {
+        Set<String> targetSentenceSet = tokenToTargetSentenceMap.get(token);
+        if (targetSentenceSet == null)
+        {
+            targetSentenceSet = new HashSet<String>();
+            tokenToTargetSentenceMap.put(token, targetSentenceSet);
+        }
+        targetSentenceSet.add(sentence);
+    }
+    
+    private void addPinyinTokenToTargetSentenceMap(String token, String sentence)
+    {
+        Set<String> targetSentenceSet = pinyinTokenToTargetSentenceMap.get(token);
+        if (targetSentenceSet == null)
+        {
+            targetSentenceSet = new HashSet<String>();
+            pinyinTokenToTargetSentenceMap.put(token, targetSentenceSet);
+        }
+        targetSentenceSet.add(sentence);
+    }
+    
+    /*********************************** word only start ************************************/
+    
+    @Override
+    public List<String> correct(String targetStr)
+    {
+        return suggest(targetStr);
+    }
+    
     private List<String> suggest(String sInput)
     {
         List<SentenceElement> correctedList = new ArrayList<SentenceElement>();
@@ -297,7 +386,7 @@ public class CorrectionServiceImpl implements CorrectionService
             sInputResult[t] = String.valueOf(str2char[t]);
         }
         String[] MaxAndSecondMaxSequnce = getMaxAndSecondMaxSequnce(sInputResult);
-        System.out.println(Arrays.toString(MaxAndSecondMaxSequnce));
+        logger.info(Arrays.toString(MaxAndSecondMaxSequnce));
         if (MaxAndSecondMaxSequnce == null)
         {
             return new ArrayList<String>();
@@ -308,9 +397,9 @@ public class CorrectionServiceImpl implements CorrectionService
             String maxSequence = MaxAndSecondMaxSequnce[0];
             String maxSequence2 = MaxAndSecondMaxSequnce[1];
             //这里遍历sentence，可以做成并行处理，提高效率
-            //List<SentenceElement> candidateSentenceList = getCandidateSentenceList(sInput);
             List<SentenceElement> candidateSentenceList = getCandidateSentenceList(maxSequence, maxSequence2);
             
+            //这里是汉字匹配
             for (int j = 0; j < candidateSentenceList.size(); j++)
             {
                 String sentence = candidateSentenceList.get(j).getSentence();
@@ -346,8 +435,12 @@ public class CorrectionServiceImpl implements CorrectionService
         }
         if (hasError == 0)
         {
-            SentenceElement element = new SentenceElement(sInput);
-            correctedList.add(element);
+            //可能音同字不同
+            if (targetSentenceToElementMap.containsKey(sInput))
+            {
+                SentenceElement element = new SentenceElement(sInput);
+                correctedList.add(element);
+            }
         }
         SentenceElement element = new SentenceElement(sInput);
         correctedList = sortList(element, correctedList);
@@ -598,6 +691,10 @@ public class CorrectionServiceImpl implements CorrectionService
                         correctTokens.add(tokenbuf.toString());
                     }
                 }
+                if (compareFloatToInt(probBetweenTowTokens(sInputResult[sInputResult.length - 1]), 0) > 0)
+                {
+                    correctTokens.add(sInputResult[sInputResult.length - 1]);
+                }
             }
         } 
         else if (sInputResult.length == 2)
@@ -605,6 +702,24 @@ public class CorrectionServiceImpl implements CorrectionService
             if (this.compareFloatToInt(probBetweenTowTokens(sInputResult[0] + sInputResult[1]), 0) > 0)
             {
                 correctTokens.add(sInputResult[0] + sInputResult[1]);
+            }
+            else
+            {
+                if (this.compareFloatToInt(probBetweenTowTokens(sInputResult[0]), 0) > 0)
+                {
+                    correctTokens.add(sInputResult[0]);
+                }
+                if (this.compareFloatToInt(probBetweenTowTokens(sInputResult[1]), 0) > 0)
+                {
+                    correctTokens.add(sInputResult[1]);
+                }
+            }
+        }
+        else if (sInputResult.length == 1)
+        {
+            if (this.compareFloatToInt(probBetweenTowTokens(sInputResult[0]), 0) > 0)
+            {
+                correctTokens.add(sInputResult[0]);
             }
         }
         return correctTokens;
@@ -614,7 +729,7 @@ public class CorrectionServiceImpl implements CorrectionService
     {
         int count = wordCountMap.get(token) == null ? 0 : wordCountMap.get(token);
         int commonCount = commonWordCountMap.get(token) == null ? 0 : commonWordCountMap.get(token);
-        count -= commonCount * 20;
+        count -= commonCount * Constants.COMMON_WORD_TIMES;
         if (count < 0)
         {
             return (float) 0.0;
@@ -627,23 +742,6 @@ public class CorrectionServiceImpl implements CorrectionService
         {
             return (float) 0.0;
         }        
-    }
-    
-    @SuppressWarnings("unused")
-    private List<SentenceElement> getCandidateSentenceList(String sInput)
-    {
-        List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
-        int moveLength = sInput.length();
-        //TODO
-        for (int i = 1; i <= moveLength + 10; i ++)
-        {
-            List<SentenceElement> moveNameList = sentenceLengthToSentenceMap.get(i);
-            if (moveNameList != null)
-            {
-                retMoveNameList.addAll(moveNameList);
-            }
-        }
-        return retMoveNameList;
     }
     
     //这里直接抓取token
@@ -678,120 +776,18 @@ public class CorrectionServiceImpl implements CorrectionService
         return retMoveNameList;
     }
     
-    private List<SentenceElement> sortList(final SentenceElement originName, List<SentenceElement> originList)
-    {
-        //TODO 这回需要去重，因为片名库中可能有重复的
-        Set<SentenceElement> set = new HashSet<SentenceElement>(originList);
-        originList = new ArrayList<SentenceElement>(set);
-        Collections.sort(originList, new Comparator<SentenceElement>() 
-        {
-            public int compare(SentenceElement o1, SentenceElement o2)
-            {
-                double distance1 = EditDistanceUtils.getEditDistance(o1, originName);
-                double distance2 = EditDistanceUtils.getEditDistance(o2, originName);
-                if (distance1 > distance2)
-                {
-                    return 1;
-                }
-                else if (distance1 < distance2)
-                {
-                    return -1;
-                }
-                else
-                {
-                    return 0;
-                }
-            }
-        });
-        
-        if (originList.size() > selectNum)
-        {
-            return originList.subList(0, selectNum);
-        }
-        else
-        {
-            return originList;
-        }
-    }
+    /*********************************** word only end ************************************/
+
     
-    private List<String> getSentenceList(List<SentenceElement> elementList)
-    {
-        List<String> moveNameList = new ArrayList<String>();
-        for (SentenceElement element : elementList)
-        {
-            moveNameList.add(element.getSentence());
-        }
-        return moveNameList;
-    }
     
-    /* ------------------------------------------- pinyin ------------------------------------------*/
+    
+    
+    /*********************************** pinyin start ************************************/
     
     @Override
     public List<String> correctWithPinyin(String targetStr)
     {
         return suggest2(targetStr);
-    }
-    
-    private void initPinyinCountMap()
-    {
-        lock.lock();
-        BufferedReader br = null;
-        try
-        {
-            Map<PinyinElement, Integer> wordCountMapTmp = new HashMap<PinyinElement, Integer>();
-            File targetFile = new File(targetFilePath);
-            br = new BufferedReader(new FileReader(targetFile));
-            
-            String wordsline = null;
-            String targetline = null;
-            while ((wordsline = br.readLine()) != null)
-            {
-                targetline = wordsline.replace(" ", "");
-                String[] words = wordsline.trim().split(" ");
-                List<PinyinElement> pinyinList = new ArrayList<PinyinElement>();
-                for (String word : words)
-                {
-                    pinyinList.add(new PinyinElement(word));
-                }
-                for (int i = 0; i < pinyinList.size(); i ++)
-                {
-                    PinyinElement element = pinyinList.get(i);
-                    int wordCount = wordCountMapTmp.get(element) == null ? 0 : wordCountMapTmp.get(element);
-                    wordCountMapTmp.put(element, wordCount + 1);
-                    addPinyinTokenToTargetSentenceMap(element.getPinyin(), targetline);
-                    totalTokensCount2 += 1;
-                    
-                    if (words.length > 1 && i < words.length - 1)
-                    {
-                        PinyinElement element1 = PinyinUtils.append(pinyinList.get(i), pinyinList.get(i + 1));
-                        int wordStrCount = wordCountMapTmp.get(element1) == null ? 0 : wordCountMapTmp.get(element1);
-                        wordCountMapTmp.put(element1, wordStrCount+1);
-                        addPinyinTokenToTargetSentenceMap(element1.getPinyin(), targetline);
-                        totalTokensCount2 += 1;
-                    }
-                }               
-            }
-            pinyinCountMap = wordCountMapTmp;
-        }
-        catch (IOException e) 
-        {
-            e.printStackTrace();
-        }
-        finally
-        {
-            lock.unlock();
-            if (br != null)
-            {
-                try
-                {
-                    br.close();
-                } 
-                catch (IOException e)
-                {
-                    //Do nothing
-                }
-            }
-        }
     }
     
     private List<String> suggest2(String sInput)
@@ -800,46 +796,46 @@ public class CorrectionServiceImpl implements CorrectionService
         List<SentenceElement> crtTempList = new ArrayList<SentenceElement>();
 
         char[] str2char = sInput.toCharArray();
-        PinyinElement[] sInputResult = new PinyinElement[str2char.length];
+        SentenceElement[] sInputResult = new SentenceElement[str2char.length];
         for (int t = 0; t < str2char.length; t++)
         {
-            sInputResult[t] = new PinyinElement(String.valueOf(str2char[t]));
+            sInputResult[t] = new SentenceElement(String.valueOf(str2char[t]));
         }
-        PinyinElement[] MaxAndSecondMaxSequnce = getMaxAndSecondMaxSequnce2(sInputResult);
-        System.out.println(Arrays.toString(MaxAndSecondMaxSequnce));
-        MaxAndSecondMaxSequnce = adjustMaxAndSecondMaxSequnceForPinyin(MaxAndSecondMaxSequnce);
+        SentenceElement[] MaxAndSecondMaxSequnce = getMaxAndSecondMaxSequnce2(sInputResult);
+        logger.info(Arrays.toString(MaxAndSecondMaxSequnce));
         if (MaxAndSecondMaxSequnce == null || MaxAndSecondMaxSequnce.length == 0)
         {
             return new ArrayList<String>();
         }
         if (MaxAndSecondMaxSequnce.length > 1)
         {
-            PinyinElement maxSequence = MaxAndSecondMaxSequnce[0];
-            PinyinElement maxSequence2 = MaxAndSecondMaxSequnce[1];
+            SentenceElement maxSequence = MaxAndSecondMaxSequnce[0];
+            SentenceElement maxSequence2 = MaxAndSecondMaxSequnce[1];
             //这里遍历sentence，可以做成并行处理，提高效率
-            //List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(sInput);
-            List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyin(), maxSequence2.getPinyin());
+            List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyinEle().getPinyin(), maxSequence2.getPinyinEle().getPinyin());
+            
+            //这里比较拼音，所以调用的是contains(PinyinElement element)
             for (int j = 0; j < candidateSentenceList.size(); j++)
             {
                 SentenceElement sentenceElement = candidateSentenceList.get(j);
-                if (maxSequence2.isEmpty())
+                if (maxSequence2 == null || maxSequence2.getLength() == 0)
                 {
-                    if (sentenceElement.contains(maxSequence))
+                    if (sentenceElement.contains(maxSequence.getPinyinEle()))
                     {
                         correctedList.add(candidateSentenceList.get(j));
                     }
                 }
                 else 
                 {
-                    if (sentenceElement.contains(maxSequence) && sentenceElement.contains(maxSequence2))
+                    if (sentenceElement.contains(maxSequence.getPinyinEle()) && sentenceElement.contains(maxSequence2.getPinyinEle()))
                     {
                         crtTempList.add(candidateSentenceList.get(j));
                     }
-                    else if (sentenceElement.contains(maxSequence)) 
+                    else if (sentenceElement.contains(maxSequence.getPinyinEle())) 
                     {
                         correctedList.add(candidateSentenceList.get(j));
                     }
-                    else if (sentenceElement.contains(maxSequence2))
+                    else if (sentenceElement.contains(maxSequence2.getPinyinEle()))
                     {
                         correctedList.add(candidateSentenceList.get(j));
                     }
@@ -854,13 +850,13 @@ public class CorrectionServiceImpl implements CorrectionService
         }
         else if (MaxAndSecondMaxSequnce.length == 1)
         {
-            PinyinElement maxSequence = MaxAndSecondMaxSequnce[0];
-            List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyin(), null);
+            SentenceElement maxSequence = MaxAndSecondMaxSequnce[0];
+            List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyinEle().getPinyin(), null);
             
             for (int j = 0; j < candidateSentenceList.size(); j++)
             {
                 SentenceElement sentenceElement = candidateSentenceList.get(j);
-                if (sentenceElement.contains(maxSequence))
+                if (sentenceElement.contains(maxSequence.getPinyinEle()))
                 {
                     correctedList.add(candidateSentenceList.get(j));
                 }
@@ -868,31 +864,18 @@ public class CorrectionServiceImpl implements CorrectionService
         }
         if (hasError == 0)
         {
-            SentenceElement element = new SentenceElement(sInput);
-            correctedList.add(element);
+            //可能音同字不同
+            if (targetSentenceToElementMap.containsKey(sInput))
+            {
+                SentenceElement element = new SentenceElement(sInput);
+                correctedList.add(element);
+            }
         }
 
         SentenceElement element = new SentenceElement(sInput);
         correctedList = sortList(element, correctedList);
         
         return getSentenceList(correctedList);
-    }
-    
-    private PinyinElement[] adjustMaxAndSecondMaxSequnceForPinyin(PinyinElement[] maxAndSecondMaxSequnce)
-    {
-        if (maxAndSecondMaxSequnce == null || maxAndSecondMaxSequnce.length == 0)
-        {
-            return null;
-        }
-        List<PinyinElement> retList = new ArrayList<PinyinElement>();
-        for (PinyinElement element : maxAndSecondMaxSequnce)
-        {
-            if (element.getLength() >= 2)
-            {
-                retList.add(element);
-            }
-        }
-        return retList.toArray(new PinyinElement[retList.size()]);
     }
     
     /**
@@ -904,11 +887,11 @@ public class CorrectionServiceImpl implements CorrectionService
      * @param sInputResult
      * @return
      */
-    private PinyinElement[] getMaxAndSecondMaxSequnce2(PinyinElement[] sInputResult)
+    private SentenceElement[] getMaxAndSecondMaxSequnce2(SentenceElement[] sInputResult)
     {
         //这句话中每个单词开始能够找到的最长的String，并且该String是在tokenMap中可以找的，把这个写入到correctTokens中
-        List<PinyinElement> correctTokens = getCorrectTokens2(sInputResult);
-        PinyinElement[] maxAndSecondMaxSeq = new PinyinElement[2];
+        List<SentenceElement> correctTokens = getCorrectTokens2(sInputResult);
+        SentenceElement[] maxAndSecondMaxSeq = new SentenceElement[2];
         if (correctTokens.size() == 0) 
         {
             return null;
@@ -920,9 +903,9 @@ public class CorrectionServiceImpl implements CorrectionService
             return maxAndSecondMaxSeq;
         }
         
-        PinyinElement maxSequence = correctTokens.get(0);
-        PinyinElement maxSequence2 = correctTokens.get(correctTokens.size() - 1);
-        PinyinElement littleword = new PinyinElement();
+        SentenceElement maxSequence = correctTokens.get(0);
+        SentenceElement maxSequence2 = correctTokens.get(correctTokens.size() - 1);
+        SentenceElement littleword = new SentenceElement();
         for (int i = 1; i < correctTokens.size(); i++)
         {
             //优先匹配最长的，所以最长的应该是在maxSequence中的
@@ -964,6 +947,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 }
             }
         }
+        
         //delete the sub-word from a string
         if (maxSequence2.getLength() == maxSequence.getLength())
         {
@@ -971,13 +955,13 @@ public class CorrectionServiceImpl implements CorrectionService
             int maxseq2valuableTokens = maxSequence2.getLength();
             float min_truncate_prob_a = 0 ;
             float min_truncate_prob_b = 0;
-            PinyinElement aword = new PinyinElement();
-            PinyinElement bword = new PinyinElement();
+            SentenceElement aword = new SentenceElement();
+            SentenceElement bword = new SentenceElement();
             //这里在选择出maxSequence和maxSequence2后，会查看其subString出现的最大频次，出现频率越多，说明其带有的特征信息越少，所以要把这部分除去
             for (int i = 0; i < correctTokens.size(); i++)
             {
                 float tokenprob = probBetweenTowTokens2(correctTokens.get(i));
-                if ((!maxSequence.equals(correctTokens.get(i))) && maxSequence.contains(correctTokens.get(i)))
+                if ((!maxSequence.equals(correctTokens.get(i))) && maxSequence.contains(correctTokens.get(i).getPinyinEle()))
                 {
                     if (tokenprob >= min_truncate_prob_a)
                     {
@@ -985,7 +969,7 @@ public class CorrectionServiceImpl implements CorrectionService
                         aword = correctTokens.get(i);
                     }
                 }
-                else if ((!maxSequence2.equals(correctTokens.get(i))) && maxSequence2.contains(correctTokens.get(i)))
+                else if ((!maxSequence2.equals(correctTokens.get(i))) && maxSequence2.contains(correctTokens.get(i).getPinyinEle()))
                 {
                     if (tokenprob >= min_truncate_prob_b)
                     {
@@ -994,27 +978,27 @@ public class CorrectionServiceImpl implements CorrectionService
                     }
                 }
             }
-            //System.out.println(min_truncate_prob_a + " VS " + min_truncate_prob_b);
+            logger.debug(min_truncate_prob_a + " VS " + min_truncate_prob_b);
             //maxSequence的subString频次较小，说明maxSequence2的substring肯定也有了，就会对token的权重进行修改
             //这里是什么情况？？
             if (aword.getLength() > 0 && min_truncate_prob_a < min_truncate_prob_b)
             {
                 //对长度进行修改
                 maxseqvaluableTokens -= 1 ;
-                littleword = maxSequence.remove(aword);
+                littleword = maxSequence.remove(aword.getPinyinEle());
             }
             else if ((maxSequence2.getLength() - bword.getLength()) >= 2)
             {
                 maxseq2valuableTokens -= 1 ;
-                PinyinElement temp = new PinyinElement(maxSequence2);
+                SentenceElement temp = new SentenceElement(maxSequence2);
                 //如果maxSequence也包含maxSequence2除去共性较多的信息后，那么littleword就是maxSequence2
-                if (maxSequence.contains(temp.remove(bword)))
+                if (maxSequence.contains((temp.remove(bword.getPinyinEle()).getPinyinEle())))
                 {
                     littleword =  maxSequence2;
                 }
                 else 
                 {
-                    littleword =  maxSequence2.remove(bword);
+                    littleword =  maxSequence2.remove(bword.getPinyinEle());
                 }
             }
             
@@ -1034,9 +1018,9 @@ public class CorrectionServiceImpl implements CorrectionService
         return maxAndSecondMaxSeq;
     }
     
-    private List<PinyinElement> getCorrectTokens2(PinyinElement[] sInputResult)
+    private List<SentenceElement> getCorrectTokens2(SentenceElement[] sInputResult)
     {
-        List<PinyinElement> correctTokens = new ArrayList<PinyinElement>();
+        List<SentenceElement> correctTokens = new ArrayList<SentenceElement>();
         float probOne = 0;
         List<Integer> isCorrect = new ArrayList<Integer>();
         for (int i = 0; i < sInputResult.length; i++)
@@ -1062,7 +1046,7 @@ public class CorrectionServiceImpl implements CorrectionService
                 //这里是将该sInputResult中所有连在一起的组合的可能性，都查找一遍
                 for (int i = 0; i < sInputResult.length - 1; i++)
                 {
-                    PinyinElement tokenbuf = new PinyinElement();
+                    SentenceElement tokenbuf = new SentenceElement();
                     tokenbuf.append(sInputResult[i]);
                     for(int j = i + 1; j < sInputResult.length; j++)
                     {
@@ -1098,7 +1082,7 @@ public class CorrectionServiceImpl implements CorrectionService
             {
                 for (int i = 0; i < sInputResult.length - 1; i++)
                 {
-                    PinyinElement tokenbuf = new PinyinElement();
+                    SentenceElement tokenbuf = new SentenceElement();
                     int a = isCorrect.get(i);
                     //单个词匹配上了
                     if (a > 0)
@@ -1140,6 +1124,10 @@ public class CorrectionServiceImpl implements CorrectionService
                         correctTokens.add(tokenbuf);
                     }
                 }
+                if (compareFloatToInt(probBetweenTowTokens2(sInputResult[sInputResult.length - 1]), 0) > 0)
+                {
+                    correctTokens.add(sInputResult[sInputResult.length - 1]);
+                }
             }
         } 
         else if (sInputResult.length == 2)
@@ -1148,13 +1136,31 @@ public class CorrectionServiceImpl implements CorrectionService
             {
                 correctTokens.add(PinyinUtils.append(sInputResult[0], sInputResult[1]));
             }
+            if (compareFloatToInt(probBetweenTowTokens2(sInputResult[0]), 0) > 0)
+            {
+                correctTokens.add(PinyinUtils.append(sInputResult[0]));
+            }
+            if (compareFloatToInt(probBetweenTowTokens2(sInputResult[1]), 0) > 0)
+            {
+                correctTokens.add(PinyinUtils.append(sInputResult[1]));
+            }
+        }
+        else if (sInputResult.length == 1)
+        {
+            if (compareFloatToInt(probBetweenTowTokens2(sInputResult[0]), 0) > 0)
+            {
+                correctTokens.add(PinyinUtils.append(sInputResult[0]));
+            }
         }
         return correctTokens;
     }
     
-    private float probBetweenTowTokens2(PinyinElement token)
+    private float probBetweenTowTokens2(SentenceElement token)
     {
-        int count = pinyinCountMap.get(token) == null ? 0 : pinyinCountMap.get(token);
+        int count = pinyinCountMap.get(token.getPinyinEle()) == null ? 0 : pinyinCountMap.get(token.getPinyinEle());
+        String tokenWord = token.getSentence();
+        int commonCount = commonWordCountMap.get(tokenWord) == null ? 0 : commonWordCountMap.get(tokenWord);
+        count -= commonCount * Constants.COMMON_PINYIN_TIMES;
         if (totalTokensCount2 > 0 )
         {
             return (float) count / totalTokensCount2;
@@ -1163,23 +1169,6 @@ public class CorrectionServiceImpl implements CorrectionService
         {
             return (float) 0.0;
         }
-    }
-    
-    @SuppressWarnings("unused")
-    private List<SentenceElement> getCandidateSentenceList2(String sInput)
-    {
-        List<SentenceElement> retMoveNameList = new ArrayList<SentenceElement>();
-        int moveLength = sInput.length();
-        //TODO
-        for (int i = 1; i <= moveLength * 2; i ++)
-        {
-            List<SentenceElement> moveNameList = sentenceLengthToSentenceMap.get(i);
-            if (moveNameList != null)
-            {
-                retMoveNameList.addAll(moveNameList);
-            }
-        }
-        return retMoveNameList;
     }
     
     private List<SentenceElement> getCandidateSentenceList2(String maxSequence, String maxSequence2)
@@ -1213,6 +1202,54 @@ public class CorrectionServiceImpl implements CorrectionService
         return retMoveNameList;
     }
     
+    /*********************************** pinyin end ************************************/
+    
+    private List<String> getSentenceList(List<SentenceElement> elementList)
+    {
+        List<String> moveNameList = new ArrayList<String>();
+        for (SentenceElement element : elementList)
+        {
+            moveNameList.add(element.getSentence());
+        }
+        return moveNameList;
+    }
+    
+    private List<SentenceElement> sortList(final SentenceElement originName, List<SentenceElement> originList)
+    {
+        //TODO 这回需要去重，因为片名库中可能有重复的
+        Set<SentenceElement> set = new HashSet<SentenceElement>(originList);
+        originList = new ArrayList<SentenceElement>(set);
+        Collections.sort(originList, new Comparator<SentenceElement>() 
+        {
+            public int compare(SentenceElement o1, SentenceElement o2)
+            {
+                double distance1 = EditDistanceUtils.getEditDistance(o1, originName);
+                double distance2 = EditDistanceUtils.getEditDistance(o2, originName);
+                if (distance1 > distance2)
+                {
+                    return 1;
+                }
+                else if (distance1 < distance2)
+                {
+                    return -1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+        });
+        
+        if (originList.size() > Constants.CHOOSE_NUM)
+        {
+            return originList.subList(0, Constants.CHOOSE_NUM);
+        }
+        else
+        {
+            return originList;
+        }
+    }
+    
     private int compareFloatToInt(float floatVal, int intVal)
     {
         if(Math.abs(floatVal - intVal) < 1e-5)
@@ -1229,25 +1266,4 @@ public class CorrectionServiceImpl implements CorrectionService
         }
     }
     
-    private void addTokenToTargetSentenceMap(String token, String sentence)
-    {
-        Set<String> targetSentenceSet = tokenToTargetSentenceMap.get(token);
-        if (targetSentenceSet == null)
-        {
-            targetSentenceSet = new HashSet<String>();
-            tokenToTargetSentenceMap.put(token, targetSentenceSet);
-        }
-        targetSentenceSet.add(sentence);
-    }
-    
-    private void addPinyinTokenToTargetSentenceMap(String token, String sentence)
-    {
-        Set<String> targetSentenceSet = pinyinTokenToTargetSentenceMap.get(token);
-        if (targetSentenceSet == null)
-        {
-            targetSentenceSet = new HashSet<String>();
-            pinyinTokenToTargetSentenceMap.put(token, targetSentenceSet);
-        }
-        targetSentenceSet.add(sentence);
-    }
 }

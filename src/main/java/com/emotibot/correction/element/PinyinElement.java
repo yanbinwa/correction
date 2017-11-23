@@ -31,16 +31,23 @@ public class PinyinElement
         return this.pinyin;
     }
     
+    /**
+     * append会改变自己的返回
+     * @param other
+     * @return
+     */
     public PinyinElement append(PinyinElement other)
     {
-        if (this.isEmpty())
+        String pinyinStr = this.pinyin + PinyinUtils.PINYIN_SPLIT + other.pinyin; 
+        if (pinyinStr.startsWith(PinyinUtils.PINYIN_SPLIT))
         {
-            this.pinyin = other.pinyin;
+            pinyinStr = pinyinStr.substring(1);
         }
-        else
+        if (pinyinStr.endsWith(PinyinUtils.PINYIN_SPLIT))
         {
-            this.pinyin = this.pinyin + PinyinUtils.PINYIN_SPLIT + other.pinyin;
+            pinyinStr = pinyinStr.substring(0, pinyinStr.length() - 1);
         }
+        this.pinyin = pinyinStr;
         return this;
     }
     
@@ -55,6 +62,36 @@ public class PinyinElement
             String[] tmp = this.pinyin.split(PinyinUtils.PINYIN_SPLIT);
             return tmp.length;
         }
+    }
+    
+    //TODO
+    public PinyinElement subPinyinElement(int start, int end)
+    {
+        if (start >= end)
+        {
+            return null;
+        }
+        if (end > this.getLength())
+        {
+            return null;
+        }
+        if (this.getLength() == 0)
+        {
+            return null;
+        }
+        String[] tmp = this.pinyin.split(PinyinUtils.PINYIN_SPLIT);
+        String ret = "";
+        for(int i = start; i < end; i ++)
+        {
+            ret += tmp[i] + PinyinUtils.PINYIN_SPLIT;
+        }
+        if (ret.endsWith(PinyinUtils.PINYIN_SPLIT))
+        {
+            ret = ret.substring(0, ret.length() - 1);
+        }
+        PinyinElement retElement = new PinyinElement();
+        retElement.setPinyin(ret);
+        return retElement;
     }
     
     //这里要保证拼音的完整性

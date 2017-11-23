@@ -1,6 +1,7 @@
 package com.emotibot.correction.utils;
 
 import com.emotibot.correction.element.PinyinElement;
+import com.emotibot.correction.element.SentenceElement;
 
 import net.sourceforge.pinyin4j.PinyinHelper;
 import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
@@ -13,6 +14,7 @@ public class PinyinUtils
 {
     public static final String PINYIN_SPLIT = "&";
     private static HanyuPinyinOutputFormat defaultFormat = null;
+    private static final String[] HANZI_NUM = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
     
     static
     {
@@ -22,67 +24,105 @@ public class PinyinUtils
         defaultFormat.setVCharType(HanyuPinyinVCharType.WITH_V);
     }
     
+//    public static boolean comparePinyin(char word1, char word2)
+//    {
+//        if (String.valueOf(word1).matches("[\u4e00-\u9fa5]+")
+//                && String.valueOf(word2).matches("[\u4e00-\u9fa5]+"))
+//        {
+//            try
+//            {
+//                String pinyin1 = PinyinHelper.toHanyuPinyinStringArray(word1, defaultFormat)[0];
+//                String pinyin2 = PinyinHelper.toHanyuPinyinStringArray(word2, defaultFormat)[0];
+//                return pinyin1.equals(pinyin2);
+//            } 
+//            catch (BadHanyuPinyinOutputFormatCombination e)
+//            {
+//                e.printStackTrace();
+//                return false;
+//            }
+//        }
+//        else
+//        {
+//            return false;
+//        }
+//    }
+    
     public static boolean comparePinyin(char word1, char word2)
     {
-        if (String.valueOf(word1).matches("[\u4e00-\u9fa5]+")
-                && String.valueOf(word2).matches("[\u4e00-\u9fa5]+"))
-        {
-            try
-            {
-                String pinyin1 = PinyinHelper.toHanyuPinyinStringArray(word1, defaultFormat)[0];
-                String pinyin2 = PinyinHelper.toHanyuPinyinStringArray(word2, defaultFormat)[0];
-                return pinyin1.equals(pinyin2);
-            } 
-            catch (BadHanyuPinyinOutputFormatCombination e)
-            {
-                e.printStackTrace();
-                return false;
-            }
-        }
-        else
-        {
-            return false;
-        }
+        String str1 = String.valueOf(word1);
+        String str2 = String.valueOf(word2);
+        String pinyin1 = getPinyin(str1);
+        String pinyin2 = getPinyin(str2);
+        return pinyin1.equals(pinyin2);
     }
+    
+//    public static boolean comparePinyin2(char word1, char word2)
+//    {
+//        if (String.valueOf(word1).matches("[\u4e00-\u9fa5]+")
+//                && String.valueOf(word2).matches("[\u4e00-\u9fa5]+"))
+//        {
+//            try
+//            {
+//                String pinyin1 = PinyinHelper.toHanyuPinyinStringArray(word1, defaultFormat)[0].trim();
+//                String pinyin2 = PinyinHelper.toHanyuPinyinStringArray(word2, defaultFormat)[0].trim();
+//                if (pinyin1.equals(pinyin2))
+//                {
+//                    return true;
+//                }
+//                else
+//                {
+//                    if (pinyin1.endsWith("g"))
+//                    {
+//                        pinyin1 = pinyin1.substring(0, pinyin1.length() - 1);
+//                    }
+//                    if (pinyin2.endsWith("g"))
+//                    {
+//                        pinyin2 = pinyin2.substring(0, pinyin2.length() - 1);
+//                    }
+//                    return pinyin1.equals(pinyin2);
+//                }
+//            } 
+//            catch (BadHanyuPinyinOutputFormatCombination e)
+//            {
+//                e.printStackTrace();
+//                return false;
+//            }
+//        }
+//        else
+//        {
+//            return false;
+//        }
+//    }
     
     public static boolean comparePinyin2(char word1, char word2)
     {
-        if (String.valueOf(word1).matches("[\u4e00-\u9fa5]+")
-                && String.valueOf(word2).matches("[\u4e00-\u9fa5]+"))
+        String str1 = String.valueOf(word1);
+        String str2 = String.valueOf(word2);
+        String pinyin1 = getPinyin(str1);
+        String pinyin2 = getPinyin(str2);
+        if (pinyin1.equals(pinyin2))
         {
-            try
-            {
-                String pinyin1 = PinyinHelper.toHanyuPinyinStringArray(word1, defaultFormat)[0].trim();
-                String pinyin2 = PinyinHelper.toHanyuPinyinStringArray(word2, defaultFormat)[0].trim();
-                if (pinyin1.equals(pinyin2))
-                {
-                    return true;
-                }
-                else
-                {
-                    if (pinyin1.endsWith("g"))
-                    {
-                        pinyin1 = pinyin1.substring(0, pinyin1.length() - 1);
-                    }
-                    if (pinyin2.endsWith("g"))
-                    {
-                        pinyin2 = pinyin2.substring(0, pinyin2.length() - 1);
-                    }
-                    return pinyin1.equals(pinyin2);
-                }
-            } 
-            catch (BadHanyuPinyinOutputFormatCombination e)
-            {
-                e.printStackTrace();
-                return false;
-            }
+            return true;
         }
         else
         {
-            return false;
+            if (pinyin1.endsWith("g"))
+            {
+                pinyin1 = pinyin1.substring(0, pinyin1.length() - 1);
+            }
+            if (pinyin2.endsWith("g"))
+            {
+                pinyin2 = pinyin2.substring(0, pinyin2.length() - 1);
+            }
+            return pinyin1.equals(pinyin2);
         }
     }
     
+    /**
+     * 这里要支持数字转拼音
+     * @param str
+     * @return
+     */
     public static String getPinyin(String str)
     {
         if (str == null)
@@ -108,6 +148,20 @@ public class PinyinUtils
                 if (str1.matches("[\u4e00-\u9fa5]+"))
                 {
                     String[] array = PinyinHelper.toHanyuPinyinStringArray(arrays[i], defaultFormat);
+                    if (array == null)
+                    {
+                        pinyin.append("null");
+                    }
+                    else
+                    {
+                        pinyin.append(array[0].trim());
+                    }
+                }
+                else if(str1.matches("[\u0030-\u0039]"))
+                {
+                    int num = Integer.parseInt(str1);
+                    String str1Tmp = HANZI_NUM[num];
+                    String[] array = PinyinHelper.toHanyuPinyinStringArray(str1Tmp.toCharArray()[0], defaultFormat);
                     if (array == null)
                     {
                         pinyin.append("null");
@@ -215,6 +269,16 @@ public class PinyinUtils
     {
         PinyinElement ret = new PinyinElement();
         for(PinyinElement element : pinyinArray)
+        {
+            ret.append(element);
+        }
+        return ret;
+    }
+    
+    public static SentenceElement append(SentenceElement... sentenceArray)
+    {
+        SentenceElement ret = new SentenceElement();
+        for(SentenceElement element : sentenceArray)
         {
             ret.append(element);
         }

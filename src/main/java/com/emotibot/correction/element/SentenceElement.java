@@ -4,13 +4,13 @@ import com.emotibot.correction.utils.PinyinUtils;
 
 public class SentenceElement
 {
-    private String sentence = null;
+    private String sentence = "";
     private String[] pinyin = null;
     private PinyinElement element = new PinyinElement();
     
     public SentenceElement()
     {
-        
+         
     }
     
     public SentenceElement(SentenceElement other)
@@ -46,18 +46,35 @@ public class SentenceElement
     public void setPinyin(String[] pinyin)
     {
         this.pinyin = pinyin;
+        String pinyinStr = "";
+        for(String tmp : pinyin)
+        {
+            pinyinStr += tmp + PinyinUtils.PINYIN_SPLIT;
+        }
+        if (pinyinStr.endsWith(PinyinUtils.PINYIN_SPLIT))
+        {
+            pinyinStr = pinyinStr.substring(0, pinyinStr.length() - 1);
+        }
+        this.element = new PinyinElement();
+        this.element.setPinyin(pinyinStr);
     }
     
-    public PinyinElement getPinyinStr()
+    public PinyinElement getPinyinEle()
     {
         return this.element;
     }
     
-    public void setPinyinStr(PinyinElement element)
+    public void setPinyinEle(PinyinElement element)
     {
         this.element = element;
+        this.pinyin = element.getPinyin().split(PinyinUtils.PINYIN_SPLIT);
     }
     
+    /**
+     * 考虑拼音
+     * @param element
+     * @return
+     */
     public boolean contains(PinyinElement element)
     {
         if (element == null)
@@ -67,33 +84,114 @@ public class SentenceElement
         return this.element.contains(element);
     }
     
+    /**
+     * 考虑汉字
+     * @param element
+     * @return
+     */
+    public boolean contains(SentenceElement element)
+    {
+        if (element == null)
+        {
+            return false;
+        }
+        return this.sentence.contains(element.getSentence());
+    }
+    
     public int getLength()
     {
         return this.sentence.length();
     }
     
+    public SentenceElement append(SentenceElement other)
+    {
+        this.sentence += other.sentence;
+        this.element.append(other.getPinyinEle());
+        this.pinyin = element.getPinyin().split(PinyinUtils.PINYIN_SPLIT);
+        return this;
+    }
+    
     public SentenceElement subSentenceElement(int start, int end)
     {
         SentenceElement element = new SentenceElement();
+        if (start >= end)
+        {
+            return element;
+        }
+        if (end > this.getLength())
+        {
+            return null;
+        }
         String sentence1 = this.sentence.substring(start, end);
-        String[] pinyin1 = new String[end - start];
-        for (int i = 0; i < end - start; i ++)
-        {
-            pinyin1[i] = this.pinyin[i + start];
-        }
-        String pinyinStr = "";
-        for (int i = 0; i < pinyin1.length; i ++)
-        {
-            if (i != 0)
-            {
-                pinyinStr += PinyinUtils.PINYIN_SPLIT;
-            }
-            pinyinStr += pinyin1[i];
-        }
+        PinyinElement pinyinEle1 = this.element.subPinyinElement(start, end);
         element.setSentence(sentence1);
-        element.setPinyin(pinyin1);
-        element.setPinyinStr(new PinyinElement(pinyinStr));
+        element.setPinyinEle(pinyinEle1);
         return element;
+    }
+    
+    /**
+     * 考虑拼音
+     * @param other
+     * @return
+     */
+    public SentenceElement remove(PinyinElement other)
+    {
+        if (this.isEmpty())
+        {
+            return this;
+        }
+        if (!this.getPinyinEle().contains(other))
+        {
+            return this;
+        }
+        int startIndex = this.element.getPinyin().indexOf(other.getPinyin());
+        if (startIndex < 0)
+        {
+            return this;
+        }
+        
+        String str1 = this.element.getPinyin().substring(0, startIndex);
+        int startTimes = 0;
+        for (int i = 0; i < str1.length(); i ++)
+        {
+            if (String.valueOf(str1.toCharArray()[i]).equals(PinyinUtils.PINYIN_SPLIT))
+            {
+                startTimes ++;
+            }
+        }
+        
+        int endTimes = startTimes + other.getLength();
+        return this.subSentenceElement(0, startTimes).append(this.subSentenceElement(endTimes, this.getLength()));
+    }
+    
+    /**
+     * 考虑汉字
+     */
+    public SentenceElement remove(SentenceElement other)
+    {
+        if (this.isEmpty())
+        {
+            return this;
+        }
+        if (!this.contains(other))
+        {
+            return this;
+        }
+        int startIndex = this.sentence.indexOf(other.sentence);
+        int endIndex = other.sentence.length() + startIndex;
+        return this.subSentenceElement(0, startIndex).append(this.subSentenceElement(endIndex, this.getLength()));
+    }
+    
+    public boolean isEmpty()
+    {
+        if (sentence == null || sentence.trim().equals(""))
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
     
     @Override
@@ -105,7 +203,7 @@ public class SentenceElement
     @Override
     public int hashCode()
     {
-        String str = "" + this.sentence + this.element.getPinyin();
+        String str = this.sentence;
         return str.hashCode();
     }
     
@@ -124,17 +222,13 @@ public class SentenceElement
             return false;
         }
         
-        if (!this.sentence.equals(other.sentence))
+        if (this.sentence.equals(other.sentence))
         {
-            return false;
-        }
-        else if (!this.element.equals(other.element))
-        {
-            return false;
+            return true;
         }
         else
         {
-            return true;
+            return false;
         }
     }
 }
