@@ -2,6 +2,14 @@ package com.emotibot.correction.element;
 
 import com.emotibot.correction.utils.PinyinUtils;
 
+/**
+ * 经测试，汉字到拼音的转换比较，对应查询语句和片库尽量只进行一次转换，满足append，
+ * remove, sub等操作。
+ * 
+ * @author emotibot
+ *
+ */
+
 public class SentenceElement
 {
     private String sentence = "";

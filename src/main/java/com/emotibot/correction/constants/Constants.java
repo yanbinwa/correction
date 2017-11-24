@@ -24,4 +24,8 @@ public class Constants
     
     public static final int COMMON_WORD_TIMES = 20;
     public static final int COMMON_PINYIN_TIMES = 20;
+    
+    //暂时不用
+    public static final int WORD_HIGH_LEN = 2;
+    public static final int WORD_LOW_LEN = 10;
 }

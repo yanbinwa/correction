@@ -398,7 +398,7 @@ public class CorrectionService2Impl implements CorrectionService
             String maxSequence2 = MaxAndSecondMaxSequnce[1];
             //这里遍历sentence，可以做成并行处理，提高效率
             List<SentenceElement> candidateSentenceList = getCandidateSentenceList(maxSequence, maxSequence2);
-            
+            //candidateSentenceList = adjustCandidateSentenceList(sInput, candidateSentenceList);
             //这里是汉字匹配
             for (int j = 0; j < candidateSentenceList.size(); j++)
             {
@@ -813,6 +813,7 @@ public class CorrectionService2Impl implements CorrectionService
             SentenceElement maxSequence2 = MaxAndSecondMaxSequnce[1];
             //这里遍历sentence，可以做成并行处理，提高效率
             List<SentenceElement> candidateSentenceList = getCandidateSentenceList2(maxSequence.getPinyinEle().getPinyin(), maxSequence2.getPinyinEle().getPinyin());
+            //candidateSentenceList = adjustCandidateSentenceList(sInput, candidateSentenceList);
             
             //这里比较拼音，所以调用的是contains(PinyinElement element)
             for (int j = 0; j < candidateSentenceList.size(); j++)
@@ -1204,6 +1205,22 @@ public class CorrectionService2Impl implements CorrectionService
     
     /*********************************** pinyin end ************************************/
     
+    @SuppressWarnings("unused")
+    private List<SentenceElement> adjustCandidateSentenceList(String originalSentence, List<SentenceElement> candidateSentenceList)
+    {
+        int originalLen = originalSentence.length();
+        List<SentenceElement> ret = new ArrayList<SentenceElement>();
+        for (SentenceElement element : candidateSentenceList)
+        {
+            if (element.getLength() >= (originalLen - Constants.WORD_LOW_LEN) &&
+                    element.getLength() <= (originalLen + Constants.WORD_HIGH_LEN))
+            {
+                ret.add(element);
+            }
+        }
+        return ret;
+    }
+    
     private List<String> getSentenceList(List<SentenceElement> elementList)
     {
         List<String> moveNameList = new ArrayList<String>();
@@ -1219,12 +1236,19 @@ public class CorrectionService2Impl implements CorrectionService
         //TODO 这回需要去重，因为片名库中可能有重复的
         Set<SentenceElement> set = new HashSet<SentenceElement>(originList);
         originList = new ArrayList<SentenceElement>(set);
+        //这里需要优化一下，先计算一次，之后比较的时候按照map来比较
+        Map<SentenceElement, Double> preCalculateMap = new HashMap<SentenceElement, Double>();
+        for (SentenceElement element : originList)
+        {
+            double distance = EditDistanceUtils.getEditDistance(element, originName);
+            preCalculateMap.put(element, distance);
+        }
         Collections.sort(originList, new Comparator<SentenceElement>() 
         {
             public int compare(SentenceElement o1, SentenceElement o2)
             {
-                double distance1 = EditDistanceUtils.getEditDistance(o1, originName);
-                double distance2 = EditDistanceUtils.getEditDistance(o2, originName);
+                double distance1 = preCalculateMap.get(o1);
+                double distance2 = preCalculateMap.get(o2);
                 if (distance1 > distance2)
                 {
                     return 1;
