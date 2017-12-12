@@ -497,7 +497,7 @@ public class CorrectionService2Impl implements CorrectionService
                 {
                     if (probBetweenTowTokens(correctTokens.get(i)) <= probBetweenTowTokens(maxSequence)) 
                     {
-                        //这里为什么选择频率低的呢？
+                        //频率越低，特征越明显
                         maxSequence2 = correctTokens.get(i);
                     }
                 }
@@ -510,6 +510,10 @@ public class CorrectionService2Impl implements CorrectionService
             {
                 if (probBetweenTowTokens(correctTokens.get(i)) > probBetweenTowTokens(maxSequence2))
                 {
+//                    if (!maxSequence.contains(correctTokens.get(i)))
+//                    {
+//                        maxSequence2 = correctTokens.get(i);
+//                    }
                     maxSequence2 = correctTokens.get(i);
                 }
             }
@@ -546,7 +550,7 @@ public class CorrectionService2Impl implements CorrectionService
             }
             //System.out.println(min_truncate_prob_a + " VS " + min_truncate_prob_b);
             //maxSequence的subString频次较小，说明maxSequence2的substring肯定也有了，就会对token的权重进行修改
-            //这里是什么情况？？
+            //TODO
             if (aword.length() > 0 && min_truncate_prob_a < min_truncate_prob_b)
             {
                 //对长度进行修改
@@ -944,6 +948,10 @@ public class CorrectionService2Impl implements CorrectionService
             {
                 if (probBetweenTowTokens2(correctTokens.get(i)) > probBetweenTowTokens2(maxSequence2))
                 {
+//                    if (!maxSequence.contains(correctTokens.get(i)))
+//                    {
+//                        maxSequence2 = correctTokens.get(i);
+//                    }
                     maxSequence2 = correctTokens.get(i);
                 }
             }
@@ -1205,6 +1213,55 @@ public class CorrectionService2Impl implements CorrectionService
     
     /*********************************** pinyin end ************************************/
     
+    
+    /*********************************** likely start ************************************/
+    
+    /*通过本地的分词得到结果，将命中common的内容去掉*/
+    @Override
+    public String getLikelyNameEntity(String nameEntity)
+    {
+        String[] tokens = SegementUtils.segementString(nameEntity);
+        if (tokens == null)
+        {
+            return nameEntity;
+        }
+        List<String> dropStrToken = new ArrayList<String>();
+        for (String token : tokens)
+        {
+            if (commonWordCountMap.containsKey(token))
+            {
+                dropStrToken.add(token);
+            }
+        }
+        Collections.sort(dropStrToken, new Comparator<String>() {
+
+            @Override
+            public int compare(String o1, String o2)
+            {
+                if (o1.length() > o2.length())
+                {
+                    return -1;
+                }
+                else if (o1.length() < o2.length())
+                {
+                    return 1;
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+            
+        });
+        for (String token : dropStrToken)
+        {
+            nameEntity = nameEntity.replaceAll(token, ""); 
+        }
+        return nameEntity;
+    }
+    
+    /*********************************** likely end ************************************/
+    
     @SuppressWarnings("unused")
     private List<SentenceElement> adjustCandidateSentenceList(String originalSentence, List<SentenceElement> candidateSentenceList)
     {
@@ -1289,5 +1346,4 @@ public class CorrectionService2Impl implements CorrectionService
             return -1;
         }
     }
-    
 }

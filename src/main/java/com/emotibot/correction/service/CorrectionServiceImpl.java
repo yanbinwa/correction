@@ -1250,4 +1250,10 @@ public class CorrectionServiceImpl implements CorrectionService
         }
         targetSentenceSet.add(sentence);
     }
+
+    @Override
+    public String getLikelyNameEntity(String nameEntity)
+    {
+        return nameEntity;
+    }
 }

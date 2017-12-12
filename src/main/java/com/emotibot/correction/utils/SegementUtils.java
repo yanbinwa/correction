@@ -7,6 +7,7 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.util.List;
 
+import com.emotibot.middleware.utils.StringUtils;
 import com.hankcs.hanlp.seg.common.Term;
 import com.hankcs.hanlp.tokenizer.StandardTokenizer;
 
@@ -126,5 +127,20 @@ public class SegementUtils
             }
         }
         return true;
+    }
+    
+    public static String[] segementString(String str)
+    {
+        if (StringUtils.isEmpty(str))
+        {
+            return null;
+        }
+        List<Term> termList = StandardTokenizer.segment(str);
+        String[] ret = new String[termList.size()];
+        for (int i = 0; i < termList.size(); i ++)
+        {
+            ret[i] = termList.get(i).word;
+        }
+        return ret;
     }
 }
