@@ -185,6 +185,78 @@ public class PinyinUtils
         }
     }
     
+    //去掉平翘舌,去掉前后鼻音
+    public static String getPinyin2(String str)
+    {
+        if (str == null)
+        {
+            return null;
+        }
+        char[] arrays = str.trim().toCharArray();
+        StringBuilder pinyin = new StringBuilder();
+        boolean isFirst = true;
+        try
+        {
+            for (int i = 0; i < arrays.length; i ++)
+            {
+                if (isFirst)
+                {
+                    isFirst = false;
+                }
+                else
+                {
+                    pinyin.append(PINYIN_SPLIT);
+                }
+                String str1 = String.valueOf(arrays[i]);
+                if (str1.matches("[\u4e00-\u9fa5]+"))
+                {
+                    String[] array = PinyinHelper.toHanyuPinyinStringArray(arrays[i], defaultFormat);
+                    if (array == null)
+                    {
+                        pinyin.append("null");
+                    }
+                    else
+                    {
+                        String pinyinRet = array[0].trim();
+                        if (pinyinRet.startsWith("zh") || pinyinRet.startsWith("sh") || pinyinRet.startsWith("ch"))
+                        {
+                            pinyinRet = pinyinRet.substring(0, 1) + pinyinRet.substring(2);
+                        }
+                        if (pinyinRet.startsWith("g"))
+                        {
+                            pinyinRet = pinyinRet.substring(0, pinyinRet.length() - 1);
+                        }
+                        pinyin.append(pinyinRet);
+                    }
+                }
+                else if(str1.matches("[\u0030-\u0039]"))
+                {
+                    int num = Integer.parseInt(str1);
+                    String str1Tmp = HANZI_NUM[num];
+                    String[] array = PinyinHelper.toHanyuPinyinStringArray(str1Tmp.toCharArray()[0], defaultFormat);
+                    if (array == null)
+                    {
+                        pinyin.append("null");
+                    }
+                    else
+                    {
+                        pinyin.append(array[0].trim());
+                    }
+                }
+                else
+                {
+                    pinyin.append(str1);
+                }
+            }
+            return pinyin.toString();
+        }
+        catch (BadHanyuPinyinOutputFormatCombination e)
+        {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
     public static boolean comparePinyin(String pinyin1, String pinyin2)
     {
         if (pinyin1 == null || pinyin2 == null)
