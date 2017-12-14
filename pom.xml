@@ -7,6 +7,23 @@
   <version>0.1.0-SNAPSHOT</version>
   <name>correction</name>
   <url>http://maven.apache.org</url>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>EmotibotRepo</id>
+      <name>dfb384e4182c-snapshots</name>
+      <url>http://docker-reg.emotibot.com.cn:8081/artifactory/libs-snapshot-local</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <repositories>
+    <repository>
+      <id>EmotibotRepo</id>
+      <url>http://docker-reg.emotibot.com.cn:8081/artifactory/libs-snapshot-local</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+    </repository>
+  </repositories>
   <dependencies>
     <!-- https://mvnrepository.com/artifact/junit/junit -->
 	<dependency>
