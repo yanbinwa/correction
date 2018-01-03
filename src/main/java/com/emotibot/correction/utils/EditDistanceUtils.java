@@ -109,7 +109,8 @@ public class EditDistanceUtils
      * @param ele2
      * @return
      */
-    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    @SuppressWarnings("unused")
+    public static int getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
     {
         boolean[] tag1 = new boolean[ele1.getLength()];
         boolean[] tag2 = new boolean[ele2.getLength()];
@@ -165,7 +166,7 @@ public class EditDistanceUtils
                 }
             }
         }
-        double ret = 0.0;
+        int ret = 0;
         for (int i = 0; i < ele1.getLength(); i ++)
         {
             if (!tag1[i])
@@ -180,7 +181,7 @@ public class EditDistanceUtils
                 ret += 1;
             }
         }
-        return ret + wordErrorCount * Constants.WORD_ERROR_COUNT_WITHOUT_ORDER;
+        return ret;
     }
     
     private static int min(int a, int b, int c)
