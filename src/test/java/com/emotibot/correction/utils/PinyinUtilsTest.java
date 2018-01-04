@@ -7,14 +7,16 @@ public class PinyinUtilsTest
 
     @Test
     public void test()
-    {
-        String str = "3生3世";
-        String ele = PinyinUtils.getPinyin(str);
-        System.out.println(ele);
+    {        
+        String str1 = "lang";
+        String str2 = "tan";
+        System.out.println(PinyinUtils.comparePinyin(str1, str2));
         
-        String str1 = "3";
-        String str2 = "三";
-        System.out.println(PinyinUtils.comparePinyin(str1.toCharArray()[0], str2.toCharArray()[0]));
+        float f = 2.0f;
+        if (f == 2)
+        {
+            System.out.println("true");
+        }
     }
 
 }

@@ -12,7 +12,9 @@ public class Constants
     public static final int CHOOSE_NUM = 50;
     public static final double WORD_ERROR_1_RATE = 0.3;
     public static final double WORD_ERROR_2_RATE = 0.5;
-    public static final double PINYIN_RIGHT_RATE = 0.1; 
+    public static final double WORD_ERROR_3_RATE = 0.7;
+    public static final float WORD_ERROR_4_RATE = 0.9f;
+    public static final double PINYIN_RIGHT_RATE = 0.1;
     public static final double WORD_ERROR_COUNT_WITHOUT_ORDER = 0.4;
     
     public static final int WORD_SINGLE_MATCH_COUNT = 1;
