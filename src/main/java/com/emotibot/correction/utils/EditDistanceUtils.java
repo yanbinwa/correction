@@ -88,11 +88,6 @@ public class EditDistanceUtils
                         temp = 0;
                         wordErrorCount2 ++;
                     }
-//                    else if (PinyinUtils.comparePinyin2(pingyin1, pingyin2))
-//                    {
-//                        temp = 0;
-//                        wordErrorCount3 ++;
-//                    }
                     else
                     {
                         temp = 1;
@@ -115,7 +110,7 @@ public class EditDistanceUtils
      * @return
      */
     @SuppressWarnings("unused")
-    public static int getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
     {
         boolean[] tag1 = new boolean[ele1.getLength()];
         boolean[] tag2 = new boolean[ele2.getLength()];
@@ -169,13 +164,30 @@ public class EditDistanceUtils
                     tag2[j] = true;
                     isMatch = true;
                 }
-//                else if (PinyinUtils.comparePinyin2(pingyin1, pingyin2))
-//                {
-//                    tag1[i] = true;
-//                    tag2[j] = true;
-//                    isMatch = true;
-//                    wordErrorCount ++;
-//                }
+            }
+        }
+        //对于剩下的进行微扰动
+        for(int i = 0; i < ele1.getLength(); i ++)
+        {
+            if (tag1[i])
+            {
+                continue;
+            }
+            String pingyin1 = pinyinArray1[i];
+            for(int j = 0; j < ele2.getLength(); j ++)
+            {
+                if (tag2[j])
+                {
+                    continue;
+                }
+                String pingyin2 = pinyinArray2[j];
+                if (PinyinUtils.comparePinyin2(pingyin1, pingyin2))
+                {
+                    tag1[i] = true;
+                    tag2[j] = true;
+                    wordErrorCount ++;
+                    break;
+                }
             }
         }
         int ret = 0;
@@ -193,7 +205,7 @@ public class EditDistanceUtils
                 ret += 1;
             }
         }
-        return ret + wordErrorCount;
+        return ret + wordErrorCount * Constants.WORD_ERROR_4_RATE;
     }
     
     /**
