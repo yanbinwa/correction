@@ -1,5 +1,8 @@
 package com.emotibot.correction.element;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.emotibot.correction.utils.PinyinUtils;
 
 /**
@@ -135,6 +138,16 @@ public class SentenceElement
         element.setSentence(sentence1);
         element.setPinyinEle(pinyinEle1);
         return element;
+    }
+    
+    public List<SentenceElement> getSingleSentenceElement()
+    {
+        List<SentenceElement> singleSentenceElements = new ArrayList<SentenceElement>();
+        for(int i = 0; i < this.getLength(); i ++)
+        {
+            singleSentenceElements.add(subSentenceElement(i, i + 1));
+        }
+        return singleSentenceElements;
     }
     
     /**
