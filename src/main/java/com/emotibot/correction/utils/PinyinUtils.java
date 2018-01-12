@@ -309,7 +309,7 @@ public class PinyinUtils
     /**
      * 去掉平翘舌和前后鼻音
      */
-    private static String clearNasalsAndPingqiao(String pinyin)
+    public static String clearNasalsAndPingqiao(String pinyin)
     {
         //1. 去掉前后鼻音
         if (pinyin.endsWith("g"))

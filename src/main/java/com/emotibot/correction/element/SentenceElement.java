@@ -238,6 +238,23 @@ public class SentenceElement
         this.element = pinyinElement;
     }
     
+    /**
+     * 去掉平翘舌和前后鼻音，执行前需要先将英文字母传成拼音
+     */
+    public void clearNasalsAndPingqiao()
+    {
+        PinyinElement pinyinElement = new PinyinElement();
+        for (int i = 0; i < this.getLength(); i ++)
+        {
+            PinyinElement pinyinElementTmp = new PinyinElement();
+            String pinyinTmp = PinyinUtils.clearNasalsAndPingqiao(pinyin[i]);
+            pinyinElementTmp.setPinyin(pinyinTmp);
+            pinyin[i] = pinyinTmp;
+            pinyinElement.append(pinyinElementTmp);
+        }
+        this.element = pinyinElement;
+    }
+    
     @Override
     public String toString()
     {
