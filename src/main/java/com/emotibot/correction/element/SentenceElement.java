@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.emotibot.correction.utils.PinyinUtils;
+import com.emotibot.middleware.utils.StringUtils;
 
 /**
  * 经测试，汉字到拼音的转换比较，对应查询语句和片库尽量只进行一次转换，满足append，
@@ -213,6 +214,28 @@ public class SentenceElement
         {
             return false;
         }
+    }
+    
+    /**
+     * 给字母添加拼音，例如D -> di
+     */
+    public void addCharacterWithPinyin()
+    {
+        PinyinElement pinyinElement = new PinyinElement();
+        for (int i = 0; i < this.getLength(); i ++)
+        {
+            String word = sentence.substring(i, i + 1);
+            PinyinElement pinyinElementTmp = new PinyinElement();
+            pinyinElementTmp.setPinyin(pinyin[i]);
+            String pinyinTmp = PinyinUtils.getPinyinForCharacter(word);
+            if (!StringUtils.isEmpty(pinyinTmp))
+            {
+                pinyinElementTmp.setPinyin(pinyinTmp);
+                pinyin[i] = pinyinTmp;
+            }
+            pinyinElement.append(pinyinElementTmp);
+        }
+        this.element = pinyinElement;
     }
     
     @Override

@@ -1,8 +1,10 @@
 package com.emotibot.correction.utils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.emotibot.correction.element.PinyinElement;
@@ -32,6 +34,24 @@ public class PinyinUtils
     private static final String[] CONFUSE_1 = {"n", "l"};
     private static final String[] CONFUSE_2 = {"h", "f"};
     private static final String[] CONFUSE_3 = {"k", "g"};
+    private static final String[] CONFUSE_4 = {"i", "in"};
+    
+    private static final String A_PINYIN = "ei";
+    private static final String B_PINYIN = "bi";
+    private static final String D_PINYIN = "di";
+    private static final String E_PINYIN = "yi";
+    private static final String G_PINYIN = "ji";
+    private static final String I_PINYIN = "ai";
+    private static final String N_PINYIN = "en";
+    private static final String O_PINYIN = "ou";
+    private static final String P_PINYIN = "pi";
+    private static final String R_PINYIN = "er";
+    private static final String T_PINYIN = "ti";
+    private static final String U_PINYIN = "you";
+    private static final String V_PINYIN = "wei";
+    private static final String Y_PINYIN = "wai";
+    
+    private static Map<String, String> charToPinyinMap;
     
     static
     {
@@ -56,6 +76,23 @@ public class PinyinUtils
         confusedList.add(CONFUSE_1);
         confusedList.add(CONFUSE_2);
         confusedList.add(CONFUSE_3);
+        confusedList.add(CONFUSE_4);
+        
+        charToPinyinMap = new HashMap<String, String>();
+        charToPinyinMap.put("a", A_PINYIN);
+        charToPinyinMap.put("b", B_PINYIN);
+        charToPinyinMap.put("d", D_PINYIN);
+        charToPinyinMap.put("e", E_PINYIN);
+        charToPinyinMap.put("g", G_PINYIN);
+        charToPinyinMap.put("i", I_PINYIN);
+        charToPinyinMap.put("n", N_PINYIN);
+        charToPinyinMap.put("o", O_PINYIN);
+        charToPinyinMap.put("p", P_PINYIN);
+        charToPinyinMap.put("r", R_PINYIN);
+        charToPinyinMap.put("t", T_PINYIN);
+        charToPinyinMap.put("u", U_PINYIN);
+        charToPinyinMap.put("v", V_PINYIN);
+        charToPinyinMap.put("y", Y_PINYIN);
     }
     
     public static boolean comparePinyin(char word1, char word2)
@@ -297,7 +334,6 @@ public class PinyinUtils
      */
     private static boolean commonFuzzy(String pinyin1, String pinyin2)
     {
-        
         String shengmu1 = getShengmu(pinyin1);
         String shengmu2 = getShengmu(pinyin2);
         String yunmu1 = getYunmu(pinyin1);
@@ -320,6 +356,7 @@ public class PinyinUtils
                 return true;
             }
         }
+
         return false;
     }
     
@@ -382,6 +419,15 @@ public class PinyinUtils
             ret.append(element);
         }
         return ret;
+    }
+    
+    public static String getPinyinForCharacter(String character)
+    {
+        if (character == null)
+        {
+            return null;
+        }
+        return charToPinyinMap.get(character.toLowerCase());
     }
     
     private static String getShengmu(String pinyin)
