@@ -25,7 +25,7 @@ public class PinyinUtils
     private static final String[] HANZI_NUM = {"零", "一", "二", "三", "四", "五", "六", "七", "八", "九"};
     
     private static final String[] SHENGMUS = {"b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "g", "x", "zh", "ch", "sh", "z", "c", "s"};
-    private static final String[] YUNMUS = {"a", "o", "i", "u", "ai", "ei", "ui", "ao", "ou", "u", "ie", "an", "en", "in", "un", "ang", "eng", "ing"};
+    private static final String[] YUNMUS = {"a", "o", "i", "u", "ai", "ei", "ui", "ao", "ou", "u", "ie", "an", "en", "in", "un", "ang", "eng", "ing", "v"};
     
     private static Set<String> shengmuSet;
     private static Set<String> yunmuSet;
@@ -35,6 +35,7 @@ public class PinyinUtils
     private static final String[] CONFUSE_2 = {"h", "f"};
     private static final String[] CONFUSE_3 = {"k", "g"};
     private static final String[] CONFUSE_4 = {"i", "in"};
+    private static final String[] CONFUSE_5 = {"i", "v"};
     
     private static final String A_PINYIN = "ei";
     private static final String B_PINYIN = "bi";
@@ -77,6 +78,7 @@ public class PinyinUtils
         confusedList.add(CONFUSE_2);
         confusedList.add(CONFUSE_3);
         confusedList.add(CONFUSE_4);
+        confusedList.add(CONFUSE_5);
         
         charToPinyinMap = new HashMap<String, String>();
         charToPinyinMap.put("a", A_PINYIN);

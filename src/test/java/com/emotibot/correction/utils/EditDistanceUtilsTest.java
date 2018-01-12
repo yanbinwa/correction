@@ -7,8 +7,8 @@ import com.emotibot.correction.element.SentenceElement;
 public class EditDistanceUtilsTest
 {
 
-    public static final String TARGET = "勇敢的心后传2";
-    public static final String INPUT = "英勇的心";
+    public static final String TARGET = "女";
+    public static final String INPUT = "率";
     
     @Test
     public void test()
