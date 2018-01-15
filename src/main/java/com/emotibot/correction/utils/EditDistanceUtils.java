@@ -14,6 +14,8 @@ public class EditDistanceUtils
 {
     public static int getEditDistance(String str1, String str2)
     {
+        str1 = str1.toLowerCase();
+        str2 = str2.toLowerCase();
         int len1 = str1.length();
         int len2 = str2.length();
         int[][] dif = new int[len1 + 1][len2 + 1];
@@ -44,9 +46,9 @@ public class EditDistanceUtils
     
     public static double getEditDistance(SentenceElement ele1, SentenceElement ele2)
     {
-        String sentence1 = ele1.getSentence();
+        String sentence1 = ele1.getSentence().toLowerCase();
         String[] pinyinArray1 = ele1.getPinyin();
-        String sentence2 = ele2.getSentence();
+        String sentence2 = ele2.getSentence().toLowerCase();
         String[] pinyinArray2 = ele2.getPinyin();
         int len1 = sentence1.length();
         int len2 = sentence2.length();
@@ -105,6 +107,8 @@ public class EditDistanceUtils
     /**
      * 首先是比较是否有相同的字，如果有，就直接消除掉，之后比较是否有相同的音，如果有，也直接消除掉，之后判断两个element是否完全匹配出来了
      * 
+     * 这里考虑字母的大小写问题
+     * 
      * @param ele1
      * @param ele2
      * @return
@@ -122,9 +126,9 @@ public class EditDistanceUtils
         {
             tag2[i] = false;
         }
-        String sentence1 = ele1.getSentence();
+        String sentence1 = ele1.getSentence().toLowerCase();
         String[] pinyinArray1 = ele1.getPinyin();
-        String sentence2 = ele2.getSentence();
+        String sentence2 = ele2.getSentence().toLowerCase();
         String[] pinyinArray2 = ele2.getPinyin();
         int wordErrorCount = 0;
         for(int i = 0; i < ele1.getLength(); i ++)
@@ -233,9 +237,9 @@ public class EditDistanceUtils
         {
             tag2[i] = false;
         }
-        String sentence1 = ele1.getSentence();
+        String sentence1 = ele1.getSentence().toLowerCase();
         String[] pinyinArray1 = ele1.getPinyin();
-        String sentence2 = ele2.getSentence();
+        String sentence2 = ele2.getSentence().toLowerCase();
         String[] pinyinArray2 = ele2.getPinyin();
         int wordErrorCount = 0;
         for(int i = 0; i < ele1.getLength(); i ++)
