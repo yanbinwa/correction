@@ -6,6 +6,8 @@ import com.emotibot.correction.element.SentenceElement;
 /**
  * 计算两个字符串的编辑距离，考虑音同字不同的情况
  * 
+ * 在计算时区分是否通过拼音
+ * 
  * @author emotibot
  *
  */
@@ -46,6 +48,18 @@ public class EditDistanceUtils
     
     public static double getEditDistance(SentenceElement ele1, SentenceElement ele2)
     {
+        return getEditDistance(ele1, ele2, true);
+    }
+    
+    /**
+     * 
+     * @param ele1
+     * @param ele2
+     * @param tag  是否考虑拼音
+     * @return
+     */
+    public static double getEditDistance(SentenceElement ele1, SentenceElement ele2, boolean tag)
+    {
         String sentence1 = ele1.getSentence().toLowerCase();
         String[] pinyinArray1 = ele1.getPinyin();
         String sentence2 = ele2.getSentence().toLowerCase();
@@ -75,7 +89,7 @@ public class EditDistanceUtils
                 {  
                     temp = 0;
                 } 
-                else
+                else if (tag)
                 {
                     String pingyin1 = pinyinArray1[i - 1];
                     String pingyin2 = pinyinArray2[j - 1];
@@ -95,6 +109,10 @@ public class EditDistanceUtils
                         temp = 1;
                     }
                 }
+                else
+                {
+                    temp = 1;
+                }
                 dif[i][j] = min(dif[i - 1][j - 1] + temp, dif[i][j - 1] + 1, dif[i - 1][j] + 1);
             }  
         } 
@@ -104,6 +122,11 @@ public class EditDistanceUtils
                 - pinyinSameCount * Constants.PINYIN_RIGHT_RATE;
     }
     
+    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    {
+        return getEditDistanceWithoutOrder(ele1, ele2, true);
+    }
+    
     /**
      * 首先是比较是否有相同的字，如果有，就直接消除掉，之后比较是否有相同的音，如果有，也直接消除掉，之后判断两个element是否完全匹配出来了
      * 
@@ -111,10 +134,10 @@ public class EditDistanceUtils
      * 
      * @param ele1
      * @param ele2
+     * @param tag  是否考虑拼音
      * @return
      */
-    @SuppressWarnings("unused")
-    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    public static double getEditDistanceWithoutOrder(SentenceElement ele1, SentenceElement ele2, boolean tag)
     {
         boolean[] tag1 = new boolean[ele1.getLength()];
         boolean[] tag2 = new boolean[ele2.getLength()];
@@ -151,7 +174,7 @@ public class EditDistanceUtils
                     break;
                 }
             }
-            if (isMatch)
+            if (isMatch || !tag)
             {
                 continue;
             }
@@ -212,6 +235,11 @@ public class EditDistanceUtils
         return ret + wordErrorCount * Constants.WORD_ERROR_4_RATE;
     }
     
+    public static int getMatchParterWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    {
+        return getMatchParterWithoutOrder(ele1, ele2, true);
+    }
+    
     /**
      * 当ele2中完全包含ele1的元素时，会得到的结果
      * 
@@ -223,8 +251,7 @@ public class EditDistanceUtils
      * @param ele2
      * @return
      */
-    @SuppressWarnings("unused")
-    public static int getMatchParterWithoutOrder(SentenceElement ele1, SentenceElement ele2)
+    public static int getMatchParterWithoutOrder(SentenceElement ele1, SentenceElement ele2, boolean tag)
     {
         boolean[] tag1 = new boolean[ele1.getLength()];
         boolean[] tag2 = new boolean[ele2.getLength()];
@@ -241,7 +268,6 @@ public class EditDistanceUtils
         String[] pinyinArray1 = ele1.getPinyin();
         String sentence2 = ele2.getSentence().toLowerCase();
         String[] pinyinArray2 = ele2.getPinyin();
-        int wordErrorCount = 0;
         for(int i = 0; i < ele1.getLength(); i ++)
         {
             char ch1 = sentence1.charAt(i);
@@ -263,7 +289,7 @@ public class EditDistanceUtils
                     break;
                 }
             }
-            if (isMatch)
+            if (isMatch || !tag)
             {
                 continue;
             }
